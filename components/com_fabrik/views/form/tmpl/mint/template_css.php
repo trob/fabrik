@@ -23,7 +23,7 @@ echo "
 }
 
 #{$view}_$c .groupintro{
-	margin-top:40px;
+	margin-top:00px;
 	padding:0 20px;
 	color:#666;
 }
@@ -47,26 +47,28 @@ echo "
 
 #{$view}_$c fieldset{
 	margin:5px 10px;
-	position:relative;
+	/*position:relative;*/
 	padding:0;
 	border:1px solid #C3E7AF;
 	background-color:#F3FCEE;
 }
 
-#{$view}_$c fieldset ul{
-	list-style:none;
-	padding:40px 10px 20px 10px;
+#{$view}_$c fieldset ul{background:yellow;
+	padding:0px 10px 20px 10px;
 	margin:0;
 }
-
+#{$view}_$c .fabrikForm .fabrikGroup ul li{background:green;
+	padding:0px 10px 20px 10px;
+	margin:0;
+}
 #{$view}_$c ul.fabrikRepeatData{
 	padding:0;
 }
 
-#{$view}_$c .fabrikForm .fabrikGroup ul{
+/*#{$view}_$c .fabrikForm .fabrikGroup ul{
 	list-style:none;
 }
-
+*/
 #details_$c .fabrikGalleryImage{
 	border:1px solid #ccc;
 	margin:5px;
