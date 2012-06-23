@@ -199,7 +199,7 @@ def("DOMPDF_DEFAULT_MEDIA_TYPE", "screen");
  *
  * @see CPDF_Adapter::PAPER_SIZES for valid sizes
  */
-def("DOMPDF_DEFAULT_PAPER_SIZE", "letter");
+def("DOMPDF_DEFAULT_PAPER_SIZE", "a4");
 
 /**
  * The default font family
@@ -291,7 +291,7 @@ def("DOMPDF_ENABLE_REMOTE", true);
  * The debug output log
  * @var string
  */
-def("DOMPDF_LOG_OUTPUT_FILE", DOMPDF_FONT_DIR."log.htm");
+def("DOMPDF_LOG_OUTPUT_FILE", DOMPDF_FONT_DIR."logaaa.htm");
 
 /**
  * A ratio applied to the fonts height to be more like browsers' line height
