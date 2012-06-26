@@ -321,7 +321,7 @@ class plgFabrik_Element extends FabrikPlugin
 			return $data;
 		}
 		$iconfile = $params->get('icon_file', ''); //Jaanus added this and following if/else; sometimes we need permanent image (e.g logo of the website where the link always points, like Wikipedia's W)
-		$cleanData = $iconfile === '' ? FabrikString::clean($data) : $iconfile;
+		$cleanData = $iconfile === '' ? FabrikString::clean(strip_tags($data)) : $iconfile;
 		foreach ($this->_imageExtensions as $ex)
 		{
 			$f = JPath::clean($cleanData . '.' . $ex);
@@ -925,14 +925,14 @@ class plgFabrik_Element extends FabrikPlugin
 	protected function modHTMLId(&$id){
 
 	}
-	
+
 	/**
 	 * should the element be tipped?
 	 * @since	3.0.6
 	 * @param	string	$mode form/list render context
 	 * @return	bool
 	 */
-	
+
 	private function isTipped($mode = 'form')
 	{
 		$formModel = $this->getFormModel();
@@ -4866,5 +4866,16 @@ FROM (SELECT DISTINCT $item->db_primary_key, $name AS value, $label AS label FRO
 			}
 		}
 	}
+
+	/**
+	 *
+	 * Forces reset of defaults, etc.
+	 */
+
+	public function reset()
+	{
+		$this->defaults = null;
+	}
+
 }
 ?>
