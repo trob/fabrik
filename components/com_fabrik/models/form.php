@@ -297,8 +297,9 @@ class FabrikFEModelForm extends FabModelForm
 		if ($tmpl != '')
 		{
 			$qs = '?c=' . $this->getId();
-			$qs .='&amp;view=' . $v; // $$$ need &amp; for pdf output which is parsed through xml parser otherwise fails
-			if (!FabrikHelperHTML::stylesheetFromPath(JPATH_THEMES . '/' . $app->getTemplate() . '/html/com_fabrik/form/' . $tmpl . '/template_css.php' . $qs))
+			// $$$ need &amp; for pdf output which is parsed through xml parser otherwise fails (if ajax loaded then dont do &amp;
+			$qs .= JRequest::getVar('ajax') == 1  ? '&view=' . $v : '&amp;view=' . $v;
+			if (!FabrikHelperHTML::stylesheetFromPath('templates/' . $app->getTemplate() . '/html/com_fabrik/form/' . $tmpl . '/template_css.php' . $qs))
 			{
 				FabrikHelperHTML::stylesheetFromPath('components/com_fabrik/views/form/tmpl/' . $tmpl . '/template_css.php' . $qs);
 			}

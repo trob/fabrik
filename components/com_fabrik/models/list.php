@@ -1455,8 +1455,7 @@ class FabrikFEModelList extends JModelForm {
 			$joins = $this->getJoins();
 			//default to the primary key as before this fix
 			$lookupC = 0;
-			$lookUps = array('DISTINCT ' . $table->db_primary_key . ' AS __pk_val' . $lookupC);
-			$lookUpNames = array($table->db_primary_key);
+			$tmpPks = array();
 
 			foreach ($joins as $join)
 			{
@@ -1498,6 +1497,35 @@ class FabrikFEModelList extends JModelForm {
 					 *
 					 */
 					$pk = $join->_params->get('pk');
+					if (!array_key_exists($pk, $tmpPks) || !is_array($tmpPks[$pk]))
+					{
+						$tmpPks[$pk] = array($pk);
+					}
+					else
+					{
+						if (count($tmpPks[$pk]) == 1)
+						{
+							$v = str_replace('`', '', $tmpPks[$pk][0]);
+							$v = explode('.', $v);
+							$v[0] = $v[0] . '_0';
+							$tmpPks[$pk][0] = $db->quoteName($v[0] . '.' . $v[1]);
+						}
+						$v = str_replace('`', '', $pk);
+						$v = explode('.', $v);
+						$v[0] = $v[0] . '_' . count($tmpPks[$pk]);
+						$tmpPks[$pk][] = $db->quoteName($v[0] . '.' . $v[1]);
+					}
+				}
+			}
+			// Check for duplicate pks if so we can presume that they are aliased with _X in from query
+			$lookupC = 0;
+			$lookUps = array('DISTINCT ' . $table->db_primary_key . ' AS __pk_val' . $lookupC);
+			$lookUpNames = array($table->db_primary_key);
+
+			foreach ($tmpPks as $pks)
+			{
+				foreach ($pks as $pk)
+				{
 					$lookUps[] = $pk . ' AS __pk_val' . ($lookupC + 1);
 					$lookUpNames[] = $pk;
 					$lookupC ++;
@@ -1528,23 +1556,25 @@ class FabrikFEModelList extends JModelForm {
 			$query['where'] = $this->_buildQueryWhere(JRequest::getVar('incfilters', 1));
 			$query['groupby'] = $this->_buildQueryGroupBy();
 			$query['order'] = $order;
-			//check that the order by fields are in the select statement
+
+			// Check that the order by fields are in the select statement
 			$squery = implode(' ', $query);
-			// can't limit the query here as this gives incorrect _data array.
-			//$db->setQuery($squery, $this->limitStart, $this->limitLength);
+
+			// Can't limit the query here as this gives incorrect _data array.
+			// $db->setQuery($squery, $this->limitStart, $this->limitLength);
 			$db->setQuery($squery);
 			$this->mergeQuery = $db->getQuery();
 			FabrikHelperHTML::debug($db->getQuery(), 'table:mergeJoinedData get ids');
 			$ids = array();
-
 			$idRows = $db->loadObjectList();
 			$maxPossibleIds = count($idRows);
-			$mainKeys = array(); // an array of the lists pk values
+			// An array of the lists pk values
+			$mainKeys = array();
 			foreach ($idRows as $r)
 			{
 				$mainKeys[] = $db->quote($r->__pk_val0);
 			}
-			//chop up main keys for list limitstart, length to cull the data down to the correct length as defined by the page nav/ list settings
+			// Chop up main keys for list limitstart, length to cull the data down to the correct length as defined by the page nav/ list settings
 			$mainKeys = array_slice(array_unique($mainKeys), $this->limitStart, $this->limitLength);
 			/**
 			 * $$$ rob get an array containing the PRIMARY key values for each joined tables data.
@@ -1572,8 +1602,7 @@ class FabrikFEModelList extends JModelForm {
 			}
 		}
 
-		// now lets actually construct the query that will get the required records:
-
+		// Now lets actually construct the query that will get the required records:
 		$query = array();
 		$query['select'] = $this->_buildQuerySelect();
 		JDEBUG ? $profiler->mark('queryselect: got') : null;
@@ -3096,6 +3125,7 @@ class FabrikFEModelList extends JModelForm {
 
 	public function shouldUpdateElement(&$elementModel, $origColName = null)
 	{
+
 		$db = FabrikWorker::getDbo();
 		$return = array(false, '', '', '', '', false);
 		$element = $elementModel->getElement();
@@ -3135,7 +3165,9 @@ class FabrikFEModelList extends JModelForm {
 		// $$$ rob base plugin needs to know group info for date fields in non-join repeat groups
 		$basePlugIn->_group = $elementModel->_group;
 		$objtype = $elementModel->getFieldDescription(); //the element type AFTER saving
+		$newObjectType = strtolower($objtype);
 		$dbdescriptions = $this->getDBFields($tableName, 'Field');
+
 		if (!$this->canAlterFields() && !$this->canAddFields())
 		{
 			$objtype = $dbdescriptions[$origColName]->Type;
@@ -3182,6 +3214,7 @@ class FabrikFEModelList extends JModelForm {
 				$existingDef .= ' ' . $thisFieldDesc->Extra;
 			}
 		}
+
 		//if its the primary 3.0
 		for ($k = 0; $k < count($keydata); $k++)
 		{
@@ -3190,7 +3223,6 @@ class FabrikFEModelList extends JModelForm {
 				$existingDef .= ' ' . $keydata[$k]['extra'];
 			}
 		}
-
 		// $$$ hugh 2012/05/13 - tweaking things a little so we don't care about certain differences in type.
 		// Initally, just integer types and signed vs unsigned.  So if the existing column is TINYINT(3) UNSIGNED
 		// and we think it's INT(3), i.e. that's what getFieldDescription() returns, let's treat those as functionally
@@ -3207,8 +3239,15 @@ class FabrikFEModelList extends JModelForm {
 		if ($element->name == $origColName && trim($base_existingDef) == $lowerobjtype)
 		{
 			//no chanages to the element name or field type
+			// give a notice if the user cant alter the field type but selections he has made would normally do so:
+			if ($this->canAlterFields() === false && trim($base_existingDef) !== $newObjectType)
+			{
+				JError::raiseNotice(301, JText::_('COM_FABRIK_NOTICE_ELEMENT_SAVED_BUT_STRUCTUAL_CHANGES_NOT_APPLIED'));
+			}
+
 			return $return;
 		}
+
 		$return[4] = $existingDef;
 		$existingfields = array_keys($dbdescriptions);
 
@@ -3510,7 +3549,7 @@ class FabrikFEModelList extends JModelForm {
 			}
 		}
 		// registry not available in admin - seems clunky anyway
-		/* echo "<pre>";print_r($reg);echO "</pre>";
+		/*
 		if (isset($reg['com_fabrik']) && array_key_exists($tid, $reg['com_fabrik']['data'])) {
 		FabrikHelperHTML::debug($reg['com_fabrik']['data']->$tid, 'session filters saved as:');
 		}
@@ -8205,22 +8244,25 @@ class FabrikFEModelList extends JModelForm {
 		$params = $this->getParams();
 		$p = json_decode($params->get('list_search_elements'));
 		$elementId = $elementModel->getId();
-		if ($add)
+		if (is_object($p) && is_array($p->search_elements))
 		{
-			if (!in_array($elementId, $p->search_elements))
+			if ($add)
 			{
-				$p->search_elements[] = (string) $elementId;
+				if (!in_array($elementId, $p->search_elements))
+				{
+					$p->search_elements[] = (string) $elementId;
+				}
 			}
-		}
-		else
-		{
-			$k = array_search($elementId, $p->search_elements);
-			if ($k !== false)
+			else
 			{
-				unset($p->search_elements[$k]);
+				$k = array_search($elementId, $p->search_elements);
+				if ($k !== false)
+				{
+					unset($p->search_elements[$k]);
+				}
 			}
+			$params->set('list_search_elements',  json_encode($p));
 		}
-		$params->set('list_search_elements',  json_encode($p));
 		$item = $this->getTable();
 		$item->params = (string) $params;
 		$item->store();

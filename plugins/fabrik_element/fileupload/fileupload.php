@@ -517,9 +517,9 @@ class plgFabrik_ElementFileupload extends plgFabrik_Element
 				return '';
 			}
 			$aclEl = $this->getFormModel()->getElement($params->get('fu_download_acl', ''), true);
-			$aclEl = $aclEl->getFullName();
 			if (!empty($aclEl))
 			{
+				$aclEl = $aclEl->getFullName();
 				$aclElraw = $aclEl . '_raw';
 				$user = JFactory::getUser();
 				$groups = $user->getAuthorisedViewLevels();
@@ -1311,6 +1311,11 @@ class plgFabrik_ElementFileupload extends plgFabrik_Element
 			}
 		}
 		$files = array_flip(array_flip($files));
+		// $$$ hugh - if we have multiple repeat joined groups, the data won't have been merged / reduced,
+		// so the double array_flip will have made 'holes' in the array, by removign duplicates.
+		// So, we need to re-index, otherwise the _formData['join'] data
+		// structure will end up havign holes in it in processToDb, and we drop data.
+		$files = array_values($files);
 		if ($params->get('upload_delete_image'))
 		{
 			foreach ($deletedImages as $filename)
@@ -2296,9 +2301,9 @@ class plgFabrik_ElementFileupload extends plgFabrik_Element
 			exit;
 		}
 		$aclEl = $this->getFormModel()->getElement($params->get('fu_download_acl', ''), true);
-		$aclEl = $aclEl->getFullName();
 		if (!empty($aclEl))
 		{
+			$aclEl = $aclEl->getFullName();
 			$aclElraw = $aclEl . '_raw';
 			$user = JFactory::getUser();
 			$groups = $user->getAuthorisedViewLevels();

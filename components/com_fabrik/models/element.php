@@ -316,7 +316,8 @@ class plgFabrik_Element extends FabrikPlugin
 			return $data;
 		}
 		$listModel = $this->getListModel();
-		if ($listModel->getOutPutFormat() == 'csv') {
+		if (in_array($listModel->getOutPutFormat(), array('csv', 'rss'))
+		{
 			$this->iconsSet = false;
 			return $data;
 		}
@@ -334,10 +335,25 @@ class plgFabrik_Element extends FabrikPlugin
 				$opts = json_encode($opts);
 				//$data = htmlspecialchars($data, ENT_QUOTES);
 				$data = '<span>' . $data . '</span>';
-				$data = htmlspecialchars($data, ENT_QUOTES);
 				if ($params->get('icon_hovertext', true))
 				{
+					$data = htmlspecialchars($data, ENT_QUOTES);
 					$img = '<a class="fabrikTip" href="#" opts=\'' . $opts . '\' title="' . $data. '">' . $img . '</a>';
+				}
+				else if (!empty($iconfile)) {
+					// $$$ hugh - kind of a hack, but ... if this is an upload element, it may already be a link, and
+					// we'll need to replace the text in the link with the image
+					// After ages dicking around with a regex to do this, decided to use DOMDocument instead!
+					$html = new DOMDocument();
+					$html->loadXML($data);
+					$as = $html->getElementsBytagName('a');
+					if ($as->length) {
+				        $img = $html->createElement('img');
+				        $img->setAttribute('src', FabrikHelperHTML::image($cleanData . '.' . $ex, $view, $tmpl, array(), true));
+				        $as->item(0)->nodeValue = '';
+				        $as->item(0)->appendChild($img);
+				        return $html->saveHTML();
+					}
 				}
 				return $img;
 			}
@@ -751,9 +767,11 @@ class plgFabrik_Element extends FabrikPlugin
 		$group = $this->getGroup();
 		if ($group->isJoin())
 		{
-			$key = 'join.' . $group->getGroup()->join_id . '.' . $key;
-			FArrayHelper::setValue($post, $key, $data);
-			FArrayHelper::setValue($_REQUEST, $key, $data);
+			$jkey = 'join.' . $group->getGroup()->join_id . '.' . $key;
+			FArrayHelper::setValue($post, $jkey, $data);
+			FArrayHelper::setValue($_REQUEST, $jkey, $data);
+			//seems the only way to add it into $post? FArrayHelper bug I guess but too scared to alter that at the moement
+			$post['join'][$group->getGroup()->join_id][$key] = $data;
 		}
 		else
 		{
@@ -770,6 +788,7 @@ class plgFabrik_Element extends FabrikPlugin
 	 * @param	$data
 	 * @param	$repeatCounter
 	 */
+
 	function getROValue($data, $repeatCounter = 0)
 	{
 		return $this->getValue($data, $repeatCounter);
@@ -808,34 +827,26 @@ class plgFabrik_Element extends FabrikPlugin
 			$rawname = $name . '_raw';
 			if ($groupModel->isJoin() || $this->isJoin())
 			{
+				$nameKey = 'join.' . $joinid . '.' . $name;
+				$rawNameKey = 'join.' . $joinid . '.' . $rawname;
+				
 				// $$$ rob 22/02/2011 this test barfed on fileuploads which weren't repeating
 				//if ($groupModel->canRepeat() || !$this->isJoin()) {
 				if ($groupModel->canRepeat())
 				{
-					if (array_key_exists('join', $data) && array_key_exists($joinid, $data['join']) && is_array($data['join'][$joinid]) && array_key_exists($name, $data['join'][$joinid]) && array_key_exists($repeatCounter, $data['join'][$joinid][$name]))
+					
+					$value = FArrayHelper::getNestedValue($data, $nameKey . '.' . $repeatCounter, null);
+					if (is_null($value))
 					{
-						$value = $data['join'][$joinid][$name][$repeatCounter];
-					}
-					else
-					{
-						if (array_key_exists('join', $data) && array_key_exists($joinid, $data['join']) && is_array($data['join'][$joinid]) && array_key_exists($name, $data['join'][$joinid]) && array_key_exists($repeatCounter, $data['join'][$joinid][$name]))
-						{
-							$value = $data['join'][$joinid][$name][$repeatCounter];
-						}
+						$value = FArrayHelper::getNestedValue($data, $rawNameKey . '.' . $repeatCounter, array());
 					}
 				}
 				else
 				{
-					if (array_key_exists('join', $data) && array_key_exists($joinid, $data['join']) && is_array($data['join'][$joinid]) && array_key_exists($name, $data['join'][$joinid]))
+					$value = FArrayHelper::getNestedValue($data, $nameKey, null);
+					if (is_null($value))
 					{
-						$value = $data['join'][$joinid][$name];
-					}
-					else
-					{
-						if (array_key_exists('join', $data) && array_key_exists($joinid, $data['join']) && is_array($data['join'][$joinid]) && array_key_exists($rawname, $data['join'][$joinid]))
-						{
-							$value = $data['join'][$joinid][$rawname];
-						}
+						$value = FArrayHelper::getNestedValue($data, $rawNameKey, array());
 					}
 					// $$$ rob if you have 2 tbl joins, one repeating and one not
 					// the none repeating one's values will be an array of duplicate values
@@ -4533,20 +4544,20 @@ FROM (SELECT DISTINCT $item->db_primary_key, $name AS value, $label AS label FRO
 		}
 		return $this->_joinModel;
 	}
-	
+
 	/**
 	 * when saving an element pk we need to update any join which has the same params->pk
 	 * @since	3.0.6
 	 * @param	string	$oldName (prevoius element name)
 	 * @param	string	$newName (new element name)
 	 */
-	
+
 	public function updateJoinedPks($oldName, $newName)
 	{
 		$db = $this->getListModel()->getDb();
 		$item = $this->getListModel()->getTable();
 		$query = $db->getQuery(true);
-		
+
 		//update linked lists id.
 		$query->update('#__{package}_joins')
 		->set('table_key = ' . $db->quote($newName))
@@ -4554,7 +4565,7 @@ FROM (SELECT DISTINCT $item->db_primary_key, $name AS value, $label AS label FRO
 		->where('table_key = ' . $db->quote($oldName));
 		$db->setQuery($query);
 		$db->query();
-		
+
 		// update join pk parameter
 		$query->clear();
 		$query->select('id')->from('#__{package}_joins')->where('table_join = ' . $db->quote($item->db_table_name));

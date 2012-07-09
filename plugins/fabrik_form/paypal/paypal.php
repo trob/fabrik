@@ -30,6 +30,9 @@ class plgFabrik_FormPaypal extends plgFabrik_Form {
 		$app = JFactory::getApplication();
 		$data = $formModel->_fullFormData;
 		$this->data = $data;
+		JTable::addIncludePath(JPATH_ADMINISTRATOR . '/components/com_fabrik/tables');
+		$log = FabTable::getInstance('log', 'FabrikTable');
+
 		if (!$this->shouldProcess('paypal_conditon')) {
 			return true;
 		}
@@ -90,6 +93,7 @@ class plgFabrik_FormPaypal extends plgFabrik_Form {
 		$opts['shipping'] = "$shipping_amount";
 
 		$item = $params->get('paypal_item');
+		$item = $w->parseMessageForPlaceHolder($item, $emailData);
 		if ($params->get('paypal_item_eval', 0) == 1) {
 			$item = @eval($item);
 			$item_raw = $item;
@@ -102,7 +106,8 @@ class plgFabrik_FormPaypal extends plgFabrik_Form {
 			}
 		}
 
-		$opts['item_name'] = "$item";
+		// $$$ hugh - strip any HTML tags from the item name, as PayPal doesn't like them.
+		$opts['item_name'] = strip_tags($item);
 
 		//$$$ rob add in subscription variables
 		if ($opts['cmd'] === '_xclick-subscriptions') {
@@ -303,6 +308,22 @@ class plgFabrik_FormPaypal extends plgFabrik_Form {
 		// $$$ hugh - thinking about putting in a call to a generic method in custom script
 		// here and passing it a reference to $opts.
 
+		if ($ipn !== false) {
+			if (method_exists($ipn, 'checkOpts')) {
+				if ($ipn->checkOpts($opts, $formModel) === false) {
+					/// log the info
+					$log->message_type = 'fabrik.paypal.onAfterProcess';
+					$msg = new stdClass();
+					$msg->opt = $opts;
+					$msg->data = $data;
+					$msg->msg = "Submission cancelled by checkOpts!";
+					$log->message = json_encode($msg);
+					$log->store();
+					return true;
+				}
+			}
+		}
+
 		$opts['custom'] = $data['formid'] . ':' . $data['rowid'] . ':' . $ipn_value;
 		$qs = array();
 		foreach ($opts as $k=>$v) {
@@ -325,8 +346,6 @@ class plgFabrik_FormPaypal extends plgFabrik_Form {
 		$session->set($context.'url', $surl);
 
 		/// log the info
-		JTable::addIncludePath(JPATH_ADMINISTRATOR . '/components/com_fabrik/tables');
-		$log = FabTable::getInstance('log', 'FabrikTable');
 		$log->message_type = 'fabrik.paypal.onAfterProcess';
 		$msg = new stdClass();
 		$msg->opt = $opts;
