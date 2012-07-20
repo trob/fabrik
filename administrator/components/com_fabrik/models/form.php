@@ -157,7 +157,7 @@ class FabrikModelForm extends FabModelAdmin
 		$js .= "controller = new fabrikAdminForm(aPlugins);\n";
 		foreach ($plugins as $plugin)
 		{
-			$opts = array_key_exists('opts', $plugin) ? $plugin['opts'] : new stdClass();
+			$opts = array_key_exists('opts', $plugin) ? $plugin['opts'] : new stdClass;
 			$opts->location = @$plugin['location'];
 			$opts->event = @$plugin['event'];
 			$opts = json_encode($opts);
@@ -209,6 +209,7 @@ class FabrikModelForm extends FabModelAdmin
 			$data['db_table_name'] = $tmpName;
 			$this->saveFormGroups($data);
 		}
+		parent::cleanCache('com_fabrik');
 		return $return;
 	}
 
@@ -418,7 +419,7 @@ class FabrikModelForm extends FabModelAdmin
 	 * @return	mixed	Array of filtered data if valid, false otherwise.
 	 * @since	1.1
 	 */
-	
+
 	function validate($form, $data, $group = null)
 	{
 		$params = $data['params'];
@@ -439,7 +440,7 @@ class FabrikModelForm extends FabModelAdmin
 	 *  delete form and form groups
 	 * @param	array	$cids to delete
 	 */
-	
+
 	public function delete(&$cids)
 	{
 		$res = parent::delete($cids);

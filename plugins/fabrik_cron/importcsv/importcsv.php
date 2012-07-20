@@ -12,10 +12,10 @@
 // Check to ensure this file is included in Joomla!
 defined('_JEXEC') or die();
 
-//require the abstract plugin class
+// Require the abstract plugin class
 require_once(COM_FABRIK_FRONTEND . '/models/importcsv.php');
 
-//require the abstract plugin class
+// Require the abstract plugin class
 require_once(COM_FABRIK_FRONTEND . '/models/plugin-cron.php');
 
 class plgFabrik_Cronimportcsv extends plgFabrik_Cron {
@@ -134,12 +134,12 @@ class plgFabrik_Cronimportcsv extends plgFabrik_Cron {
 			{
 				JFile::delete($full_csvfile);
 			}
-			else if ($deleteFile == '2')
+			elseif ($deleteFile == '2')
 			{
 				$new_csvfile = $full_csvfile . '.' . time();
 				JFile::move($full_csvfile, $new_csvfile);
 			}
-			else if ($deleteFile == '3')
+			elseif ($deleteFile == '3')
 			{
 				$done_folder = dirname($full_csvfile) . '/done';
 				if (JFolder::exists($done_folder))

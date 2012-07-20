@@ -1,9 +1,9 @@
 <?php
 /**
- * @package Joomla
- * @subpackage Fabrik
- * @copyright Copyright (C) 2005 Rob Clayburn. All rights reserved.
- * @license http://www.gnu.org/copyleft/gpl.html GNU/GPL, see LICENSE.php
+ * @package     Joomla
+ * @subpackage  Form
+ * @copyright   Copyright (C) 2005 Rob Clayburn. All rights reserved.
+ * @license     GNU General Public License version 2 or later; see LICENSE.txt
  */
 
 // Check to ensure this file is included in Joomla!
@@ -13,14 +13,14 @@ jimport('joomla.html.html');
 jimport('joomla.form.formfield');
 jimport('joomla.form.helper');
 JFormHelper::loadFieldClass('list');
-require_once(JPATH_ADMINISTRATOR . '/components/com_fabrik/helpers/element.php');
+require_once JPATH_ADMINISTRATOR . '/components/com_fabrik/helpers/element.php';
 
 /**
  * Renders a list of elements found in a fabrik table
  *
- * @package 	Joomla
- * @subpackage	Fabrik
- * @since		1.6
+ * @package     Joomla
+ * @subpackage  Form
+ * @since       1.6
  */
 
 class JFormFieldListfields extends JFormFieldList
@@ -79,7 +79,7 @@ class JFormFieldListfields extends JFormFieldList
 				{
 					$repeat = ElementHelper::getRepeat($this);
 					$tableDd = $this->element['table'];
-					$opts = new stdClass();
+					$opts = new stdClass;
 					$opts->table = ($repeat) ? 'jform_' . $tableDd . '-' .$c : 'jform_' . $tableDd;
 					$opts->conn = 'jform_' . $connectionDd;
 					$opts->value = $this->value;
@@ -88,7 +88,7 @@ class JFormFieldListfields extends JFormFieldList
 					$script = "new ListFieldsElement('$this->id', $opts);\n";
 					FabrikHelperHTML::script('administrator/components/com_fabrik/models/fields/listfields.js', $script);
 					$rows = array(JHTML::_('select.option', '', JText::_('SELECT A CONNECTION FIRST')), 'value', 'text');
-					$o = new stdClass();
+					$o = new stdClass;
 					$o->table_name = '';
 					$o->name = '';
 					$o->value = '';
@@ -158,7 +158,7 @@ class JFormFieldListfields extends JFormFieldList
 			{
 				foreach ($res as $o)
 				{
-					$s = new stdClass();
+					$s = new stdClass;
 					//element already contains correct key
 					if ($controller != 'element')
 					{

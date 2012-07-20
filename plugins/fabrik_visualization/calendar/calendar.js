@@ -18,10 +18,12 @@ var fabrikCalendar = new Class({
 			'add': 'index.php?option=com_fabrik&controller=visualization.calendar&view=visualization&task=getEvents&format=raw',
 			'del': 'index.php?option=com_fabrik&controller=visualization.calendar&view=visualization&task=deleteEvent&format=raw'
 		},
-		monthday: {'width': 90, 'height': 80}
+		monthday: {'width': 90, 'height': 80},
+		restFilterStart: 'na'
 	},
 	
 	initialize: function (el) {
+		this.firstRun = true;
 		this.el  = document.id(el);
 		this.SECOND = 1000; // the number of milliseconds in a second
 		this.MINUTE = this.SECOND * 60; // the number of milliseconds in a minute
@@ -991,6 +993,10 @@ var fabrikCalendar = new Class({
 		this.popWin = this._makePopUpWin();
 		var d = this.options.urlfilters;
 		d.visualizationid = this.options.calendarId;
+		if (this.firstRun) {
+			this.firstRun = false;
+			d.resetfilters = this.options.restFilterStart;
+		}
 		this.ajax.updateEvents = new Request({url: this.options.url.add,
 		'data': d,
 		'evalScripts': true,
@@ -1083,27 +1089,8 @@ var fabrikCalendar = new Class({
 		}
 		this.el.getElement('.centerOnToday').addEvent('click', this.centerOnToday.bindWithEvent(this));
 		this.showMonth();
-		this.watchFilters();
-		//clear filter list
 		
 		this.ajax.updateEvents.send();
-	},
-	
-	watchFilters: function () {
-		var c = this.el.getElement('.clearFilters');
-		if (c) {
-			c.addEvent('click', function (e) {
-				e.stop();
-				c.findUp('form').getElements('.fabrik_filter').each(function (f) {
-					if (f.get('tag') === 'select') {
-						f.selectedIndex = 0;
-					} else {
-						f.value = '';
-					}
-				});
-				c.findUp('form').submit();
-			}.bind(this));
-		}
 	},
 	
 	showMessage: function (m) {

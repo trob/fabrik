@@ -41,9 +41,11 @@ class FabrikControllerForm extends JController
 		$viewLayout	= JRequest::getCmd('layout', 'default');
 		$view = $this->getView('form', $viewType, '');
 		$view->setModel($model, true);
+
 		// Set the layout
 		$view->setLayout($viewLayout);
-		//todo check for cached version
+
+		// @Todo check for cached version
 		$view->inlineEdit();
 	}
 
@@ -73,7 +75,7 @@ class FabrikControllerForm extends JController
 		//test for failed validation then page refresh
 		$model->getErrors();
 		if (!JError::isError($model) && is_object($model)) {
-			
+
 			$view->setModel($model, true);
 		}
 		$view->isMambot = $this->isMambot;
@@ -207,7 +209,7 @@ class FabrikControllerForm extends JController
 			$view->display();
 			return;
 		}
-		
+
 		$listModel = $model->getListModel();
 		$listModel->set('_table', null);
 
@@ -236,7 +238,7 @@ class FabrikControllerForm extends JController
 				$redirect_opts['title'] = $session->get($context . 'redirect_content_popup_title', '');
 				$redirect_opts['reset_form'] = $session->get($context . 'redirect_content_reset_form', '1') == '1';
 			}
-			else if ($this->isMambot)
+			elseif ($this->isMambot)
 			{
 				// $$$ hugh - special case to allow custom code to specify that
 				// the form should not be cleared after a failed AJAX submit

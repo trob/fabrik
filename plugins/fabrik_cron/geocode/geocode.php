@@ -12,7 +12,7 @@
 // Check to ensure this file is included in Joomla!
 defined('_JEXEC') or die();
 
-//require the abstract plugin class
+// Require the abstract plugin class
 require_once(COM_FABRIK_FRONTEND . '/models/plugin-cron.php');
 
 
@@ -98,7 +98,7 @@ class plgFabrik_CronGeocode extends plgFabrik_Cron {
 					if ($geocode_when == '1') {
 						$do_geocode = empty($row->$geocode_map_element) || $row->$geocode_map_element == $geocode_is_empty;
 					}
-					else if ($geocode_when == '2') {
+					elseif ($geocode_when == '2') {
 						$do_geocode = empty($row->$geocode_map_element);
 					}
 					if ($do_geocode) {

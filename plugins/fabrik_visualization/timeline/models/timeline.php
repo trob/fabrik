@@ -1,10 +1,9 @@
 <?php
-
 /**
- * @package     Joomla
- * @subpackage  Fabrik
- * @copyright   Copyright (C) 2005 Rob Clayburn. All rights reserved.
- * @license     http://www.gnu.org/copyleft/gpl.html GNU/GPL, see LICENSE.php
+ * @package     Joomla.Plugin
+ * @subpackage  Fabrik.visualization.timeline
+ * @copyright   Copyright (C) 2005 Fabrik. All rights reserved.
+ * @license     GNU General Public License version 2 or later; see LICENSE.txt
  */
 
 // Check to ensure this file is included in Joomla!
@@ -16,18 +15,19 @@ require_once JPATH_SITE . '/components/com_fabrik/models/visualization.php';
 
 /**
  * Renders timeline visualization
- * 
- * @package  Fabrik
- * @since    3.0
  *
+ * @package     Joomla.Plugin
+ * @subpackage  Fabrik.visualization.timeline
+ * @since       3.0
  */
+
 class fabrikModelTimeline extends FabrikFEModelVisualization
 {
 
 	/**
-	 * internally render the plugin, and add required script declarations
+	 * Internally render the plugin, and add required script declarations
 	 * to the document
-	 * 
+	 *
 	 * @return  string  js ini
 	 */
 
@@ -92,8 +92,8 @@ class fabrikModelTimeline extends FabrikFEModelVisualization
 				$startParams = $startElement->getParams();
 
 				$action = $app->isAdmin() ? "task" : "view";
-				$nextview = $listModel->canEdit() ? "form" : "details";
 
+				// $nextview = $listModel->canEdit() ? "form" : "details";
 				foreach ($data as $group)
 				{
 					if (is_array($group))
@@ -114,18 +114,24 @@ class fabrikModelTimeline extends FabrikFEModelVisualization
 								$sDate->setTimezone($timeZone);
 								$event->end = $sDate->toISO8601(true);
 							}
-							
 							$sDate = JFactory::getDate($event->start);
 							$sDate->setTimezone($timeZone);
 							$event->start = $sDate->toISO8601(true);
-							
 							$bits = explode('+', $event->start);
 							$event->start = $bits[0] . '+00:00';
 
 							$event->title = strip_tags(@$row->$title);
+							/* if ($app->isAdmin())
+							{
+								$url = 'index.php?option=com_fabrik&task=' . $nextview . '.view&formid=' . $table->form_id . '&rowid=' . $row->__pk_val;
+							}
+							else
+							{
 							$url = 'index.php?option=com_fabrik&view=' . $nextview . '&formid=' . $table->form_id . '&rowid=' . $row->__pk_val
 								. '&listid=' . $listid;
-							$event->link = ($listModel->getOutPutFormat() == 'json') ? '#' : JRoute::_($url);
+							} */
+							$url = $this->getLinkURL($listModel, $row, $c);
+							$event->link = ($listModel->getOutPutFormat() == 'json') ? '#' : $url;
 							$event->image = '';
 							$event->color = $colour;
 							$event->textColor = $textColour;
@@ -154,15 +160,56 @@ class fabrikModelTimeline extends FabrikFEModelVisualization
 		$options->dateFormat = $params->get('timeline_date_format', '%c');
 		$options->orientation = $params->get('timeline_orientation', 'horizontal');
 		$options = json_encode($options);
-		$str = "var timeline = new FbVisTimeline($json, $options);";
+		$ref = $this->getJSRenderContext();
+		$str = "var " . $ref . " = new FbVisTimeline($json, $options);";
+		$str .= "\n" . "Fabrik.addBlock('" . $ref . "', " . $ref . ");";
 		return $str;
 		$srcs[] = 'plugins/fabrik_visualization/timeline/timeline.js';
 		FabrikHelperHTML::script($srcs, $str);
 	}
 
 	/**
+	 * Build the item link
+	 *
+	 * @param   object  $listModel  list model
+	 * @param   object  $row        current row
+	 * @param   int     $c          which data set are we in (needed for getting correct params data)
+	 *
+	 *  @return  string  url
+	 */
+
+	protected function getLinkURL($listModel, $row, $c)
+	{
+		$w = new FabrikWorker;
+		$app = JFactory::getApplication();
+		$params = $this->getParams();
+		$customLink = (array) $params->get('timeline_customlink');
+		$customLink = JArrayHelper::getValue($customLink, $c, '');
+		if ($customLink !== '')
+		{
+			$url = $w->parseMessageForPlaceHolder($customLink, JArrayHelper::fromObject($row));
+			$url = str_replace('{rowid}', $row->__pk_val, $url);
+		}
+		else
+		{
+			$nextview = $listModel->canEdit() ? "form" : "details";
+			$table = $listModel->getTable();
+			if ($app->isAdmin())
+			{
+				$url = 'index.php?option=com_fabrik&task=' . $nextview . '.view&formid=' . $table->form_id . '&rowid=' . $row->__pk_val;
+			}
+			else
+			{
+				$url = 'index.php?option=com_fabrik&view=' . $nextview . '&formid=' . $table->form_id . '&rowid=' . $row->__pk_val
+				. '&listid=' . $listModel->getId();
+			}
+		}
+		return $url;
+	}
+
+	/**
 	 * Get band info
-	 * 
+	 *
 	 * @return  array  band info
 	 */
 
@@ -190,7 +237,7 @@ class fabrikModelTimeline extends FabrikFEModelVisualization
 			$bg = JArrayHelper::getValue($bgs, $i, '');
 			if ($bg !== '')
 			{
-				$css[] = '.timeline-band-' . $i . ' .timeline-ether-bg { 
+				$css[] = '.timeline-band-' . $i . ' .timeline-ether-bg {
 				background: ' . $bg . ' !important; }';
 			}
 			$data[] = $o;
@@ -204,7 +251,7 @@ class fabrikModelTimeline extends FabrikFEModelVisualization
 
 	/**
 	 * Set list ids
-	 * 
+	 *
 	 * @return  void
 	 */
 
