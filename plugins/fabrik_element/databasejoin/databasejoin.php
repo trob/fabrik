@@ -1120,7 +1120,7 @@ class plgFabrik_ElementDatabasejoin extends plgFabrik_ElementList
 		{
 			$multiSize = (int) $params->get('dbjoin_multilist_size', 6);
 			$attribs = 'class="fabrikinput inputbox" size="' . $multiSize . '" multiple="true"';
-			$html[] = JHTML::_('select.genericlist', $tmp, $thisElName, $attribs, 'value', 'text', $defaults, $id);
+			$html[] = JHTML::_('select.genericlist', $tmp, $elName, $attribs, 'value', 'text', $defaults, $id);
 		}
 		else
 		{
@@ -1875,9 +1875,9 @@ class plgFabrik_ElementDatabasejoin extends plgFabrik_ElementList
 			else
 			{
 				$dbName = $this->getDbName();
+				$fType = $this->getElement()->filter_type;
 				if ($this->isJoin())
 				{
-					$fType = $this->getElement()->filter_type;
 					if ($fType == 'field')
 					{
 						$where = $db->quoteName($dbName . '.' . $this->getLabelParamVal());
@@ -1896,6 +1896,11 @@ class plgFabrik_ElementDatabasejoin extends plgFabrik_ElementList
 				}
 				else
 				{
+					if ($fType === 'auto-complete')
+					{
+						// If autocomplete then we should search on the element's column, not the joined label column http://fabrikar.com/forums/showthread.php?t=29977
+						$key = $db->quoteName($this->getFullName(false, false, false));
+					}
 					$str = "$key $condition $value";
 				}
 			}
@@ -2142,7 +2147,7 @@ class plgFabrik_ElementDatabasejoin extends plgFabrik_ElementList
 		$opts->popwiny = $params->get('yoffset', 0);
 		$opts->windowwidth = $params->get('join_popupwidth', 360);
 		$opts->displayType = $this->getDisplayType();
-		$opts->show_please_select = $params->get('database_join_show_please_select');
+		$opts->show_please_select = $params->get('database_join_show_please_select') === "1";
 		$opts->showDesc = $params->get('join_desc_column', '') === '' ? false : true;
 		$opts->autoCompleteOpts = $opts->displayType == 'auto-complete'
 			? FabrikHelperHTML::autoCompletOptions($opts->id, $this->getElement()->id, 'databasejoin') : null;
