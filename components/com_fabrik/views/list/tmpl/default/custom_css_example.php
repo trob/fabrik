@@ -29,5 +29,7 @@ echo "
 #listform_$c .fabrikForm {
 	margin-top: 25px !important;
 }
-
+#listform_$c ul.fabrikRepeatData li {
+	    border-bottom: 1px solid;
+    height: 40px;
 ";?>
