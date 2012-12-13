@@ -1114,6 +1114,7 @@ class plgFabrik_ElementDatabasejoin extends plgFabrik_ElementList
 		$formModel = $this->getFormModel();
 		$elName = $this->getHTMLName($repeatCounter);
 		$params = $this->getParams();
+		$id = $this->getHTMLId($repeatCounter);
 		$idname = $this->getFullName(false, true, false) . '_id';
 		$optsPerRow = intval($params->get('dbjoin_options_per_row', 0));
 		$defaults = $formModel->failedValidation() ? $default : explode(GROUPSPLITTER, JArrayHelper::getValue($data, $idname));
@@ -1170,7 +1171,7 @@ class plgFabrik_ElementDatabasejoin extends plgFabrik_ElementList
 			{
 				// $joinidsName .= '[' . $repeatCounter . '][]';
 				$joinidsName .= '[' . $repeatCounter . ']';
-				$joinids = FArrayHelper::getNestedValue($data, 'join.' . $joinId . '.' . $rawname . '.' . $repeatCounter, 'not found');
+				$joinids = FArrayHelper::getNestedValue($data, 'join.' . $join->id . '.' . $rawname . '.' . $repeatCounter, 'not found');
 			}
 			else
 			{
