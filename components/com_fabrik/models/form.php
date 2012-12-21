@@ -649,7 +649,10 @@ class FabrikFEModelForm extends FabModelForm
 					$r->$k = $v;
 				}
 				unset($r->params);
-				$this->jsActions[$r->element_id][] = $r;
+				if (!isset($r->js_published) || (int) $r->js_published === 1)
+				{
+					$this->jsActions[$r->element_id][] = $r;
+				}
 			}
 		}
 		return $this->jsActions;
@@ -1684,10 +1687,32 @@ class FabrikFEModelForm extends FabModelForm
 						{
 							$repeatTotals['el' . $elementModel->getId()][$r] = count($dataPks[$r]);
 						}
+						// $$$ hugh - need to re-index data
+						foreach ($data as &$d)
+						{
+							if (is_array($d))
+							{
+								foreach ($d as &$d2)
+								{
+									if (is_array($d2))
+									{
+										$d2 = array_values($d2);
+									}
+								}
+							}
+						}
 					}
 					else
 					{
 						$repeatTotals[$oJoin->group_id] = $elementModel->getJoinRepeatCount($data, $oJoin);
+						// $$$ hugh - need to re-index data
+						foreach ($data as &$d)
+						{
+							if (is_array($d))
+							{
+								$d = array_values($d);
+							}
+						}
 					}
 				}
 				else
