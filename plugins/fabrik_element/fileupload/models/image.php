@@ -157,7 +157,8 @@ class ImageRender
 
 				if ($params->get('make_link', true) && !$this->fullImageInRecord($params))
 				{
-					$n = $this->inTableView ? $model->getElement()->name.$thisRow->__pk_val  : $model->getElement()->name;
+					$r = isset($thisRow->__pk_val) ? $thisRow->__pk_val : '';
+					$n = $this->inTableView ? $model->getElement()->name.$r : $model->getElement()->name;
 
 					if ($params->get('restrict_lightbox', 1) == 0)
 					{
