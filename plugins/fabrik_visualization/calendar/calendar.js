@@ -3,6 +3,7 @@
  *
  * @copyright: Copyright (C) 2005-2013, fabrikar.com - All rights reserved.
  * @license:   GNU/GPL http://www.gnu.org/copyleft/gpl.html
+ *mod BET 
  */
 
 var fabrikCalendar = new Class({
@@ -125,11 +126,11 @@ var fabrikCalendar = new Class({
 				'top': opts.top.toInt() + 'px',
 				'position': 'absolute',
 				'border': '1px solid #666666',
-				'border-right': '0',
-				'border-left': '0',
+				//'border-right': '0',
+				//'border-left': '0',
 				'overflow': 'auto',
-				'opacity': 0.6,
-				'padding': '0 4px'
+				'opacity': 0.9,
+				'padding': '0 3px 0 0'
 			};
 		if (opts.height) {
 			style.height = opts.height.toInt() + 'px';
@@ -151,7 +152,7 @@ var fabrikCalendar = new Class({
 			buttons = '';
 			
 			if (entry._canDelete) {
-				buttons += this.options.buttons.del;
+				//trob: kein Delete im Kalender buttons += this.options.buttons.del;
 			}
 			
 			if (entry._canEdit && !this.options.readonly) {
@@ -493,7 +494,7 @@ var fabrikCalendar = new Class({
 				td.eliminate('calevents');
 				td.className = '';
 				td.addClass('day');
-				td.addClass(firstDate.getTime() - this.HOUR);
+				td.addClass(firstDate.getTime());// - this.HOUR);
 				if (this.selectedDate.isSameWeek(firstDate) && this.selectedDate.isSameDay(firstDate)) {
 					td.addClass('selectedDay');
 				} else {
@@ -557,7 +558,8 @@ var fabrikCalendar = new Class({
 					var opts = this._buildEventOpts({entry: entry, curdate: counterDate, divclass: '.weekView', 'tdOffset': i});
 					// Work out the left offset for the event - stops concurrent events overlapping each other
 					for (var h = opts.startHour; h <= opts.endHour; h ++) {
-						maxoffsets[h] = typeOf(maxoffsets[h]) === 'null' ? 0 : maxoffsets[h] + 1;
+						/*alles ü maxoffsets[h] = typeOf(maxoffsets[h]) === 'null' ? 0 : maxoffsets[h] + 1;*/
+						maxoffsets[h] = 0;
 					}
 				}
 			}.bind(this));
@@ -565,7 +567,7 @@ var fabrikCalendar = new Class({
 			var gridSize = 1;
 			Object.each(maxoffsets, function (o) {
 				if (o > gridSize) {
-					gridSize = o;
+					/*alles ü  gridSize = o;*/
 				}
 			});
 
@@ -581,10 +583,10 @@ var fabrikCalendar = new Class({
 
 					// Work out the left offset for the event - stops concurrent events overlapping each other
 					for (var h = opts.startHour; h <= opts.endHour; h ++) {
-						offsets[h] = typeOf(offsets[h]) === 'null' ? 0 : offsets[h] + 1;
-					}
+						/*alles ü offsets[h] = typeOf(offsets[h]) === 'null' ? 0 : offsets[h] + 1;*/
+					}	
 					var thisOffset = 0;
-					for (h = opts.startHour; h <= opts.endHour; h ++) {
+					for (h = opts.startHour; h < opts.endHour; h ++) {
 						if (offsets[h] > thisOffset) {
 							thisOffset = offsets[h];
 						}
@@ -593,7 +595,7 @@ var fabrikCalendar = new Class({
 					td = hourTds[startIndex];
 
 					// Work out event div width - taking into account 1px margin between each event
-					eventWidth = Math.floor((td.getSize().x - gridSize) / gridSize);
+					eventWidth = Math.floor((td.getSize().x - gridSize) / gridSize + 1);
 					opts.width = eventWidth + 'px';
 					opts['margin-left'] = thisOffset * (eventWidth + 1);
 					var div = this._makeEventRelDiv(entry, opts, null, td);
@@ -645,14 +647,16 @@ var fabrikCalendar = new Class({
 			duration = 1;
 		}
 
-		if (startdate.getDay() !== enddate.getDay()) {
-			duration = this.options.open !== 0 || this.options.close !== 24 ? this.options.close - this.options.open + 1 : 24;
+		//if (startdate.getDay() !== enddate.getDay()) {
+		if (!startdate.isSameDay(enddate)) {
+			//duration = this.options.open !== 0 || this.options.close !== 24 ? this.options.close - this.options.open + 1 : 24;
+			duration = 24;	
 			if (startdate.isSameDay(counterDate)) {
-				duration = this.options.open !== 0 || this.options.close !== 24 ? this.options.close - this.options.open + 1 : 24 - startdate.getHours();
+				duration = 24 - startdate.getHours();
 			} else {
 				startdate.setHours(0);
 				if (enddate.isSameDay(counterDate)) {
-					duration = this.options.open !== 0 || this.options.close !== 24 ? this.options.close - this.options.open : enddate.getHours();
+					duration =  enddate.getHours();
 				}
 			}
 		}
@@ -752,6 +756,7 @@ var fabrikCalendar = new Class({
 				// Work out the left offset for the event - stops concurrent events overlapping each other
 				for (var h = opts.startHour; h <= opts.endHour; h ++) {
 					maxoffsets[h] = typeOf(maxoffsets[h]) === 'null' ? 0 : maxoffsets[h] + 1;
+			
 				}
 			}
 		}.bind(this));
