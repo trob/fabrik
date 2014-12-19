@@ -134,6 +134,13 @@ class FabrikHelperHTML
 	protected static $requestHeaders = null;
 
 	/**
+	 * Usually gets set to COM_FABRIK_LIVESITE, but can be overridden by a global option
+	 *
+	 * @var string
+	 */
+	protected static $baseJSAssetURI = null;
+
+	/**
 	 * Load up window code - should be run in ajax loaded pages as well (10/07/2012 but not json views)
 	 * might be an issue in that we may be re-observing some links when loading in - need to check
 	 *
@@ -464,10 +471,19 @@ if (!$j3)
 
 	public static function printURL($formModel)
 	{
+		
+		/**
+		 * Comment this out for now, as it causes issues with multiple forms per page.
+		 * We could always create a $sig for it, but that would need the info from the form and
+		 * table models, which are probably the most 'expensive' aprt of this function anyway. 
+		 */
+		
+		/*
 		if (isset(self::$printURL))
 		{
 			return self::$printURL;
 		}
+		*/
 
 		$app = JFactory::getApplication();
 		$input = $app->input;
@@ -542,11 +558,19 @@ if (!$j3)
 
 	public static function emailURL($formModel)
 	{
+		/**
+		 * Comment this out for now, as it causes issues with multiple forms per page.
+		 * We could always create a $sig for it, but that would need the info from the form and
+		 * table models, which are probably the most 'expensive' aprt of this function anyway.
+		 */
+		
+		/*
 		if (isset(self::$emailURL))
 		{
 			return self::$emailURL;
 		}
-
+		*/
+		
 		$app = JFactory::getApplication();
 		$input = $app->input;
 		$package = $app->getUserState('com_fabrik.package', 'fabrik');
@@ -918,6 +942,7 @@ if (!$j3)
 			$app = JFactory::getApplication();
 			$document = JFactory::getDocument();
 			$version = new JVersion;
+			$jsAssetBaseURI = self::getJSAssetBaseURI();
 
 			// Only use template test for testing in 2.5 with my temp J bootstrap template.
 			$bootstrapped = in_array($app->getTemplate(), array('bootstrap', 'fabrik4')) || $version->RELEASE > 2.5;
@@ -944,7 +969,7 @@ if (!$j3)
 
 			if (!self::inAjaxLoadedPage())
 			{
-				$document->addScript(COM_FABRIK_LIVESITE . 'media/com_fabrik/js/lib/require/require.js');
+				$document->addScript($jsAssetBaseURI . 'media/com_fabrik/js/lib/require/require.js');
 				JText::script('COM_FABRIK_LOADING');
 				$src[] = 'media/com_fabrik/js/fabrik' . $ext;
 				$src[] = 'media/com_fabrik/js/window' . $ext;
@@ -1015,6 +1040,31 @@ if (!$j3)
 	}
 
 	/**
+	 * Checks the js_base_url global config, to see if admin has set a base URI they want to use to
+	 * fetch JS assets from.  Allows for putting JS files in a fast CDN like Amazon.  If not set,
+	 * return COM_FABRIK_LIVESITE.
+	 *
+	 * @return string
+	 */
+	public static function getJSAssetBaseURI()
+	{
+		if (!isset(static::$baseJSAssetURI))
+		{
+			$usersConfig = JComponentHelper::getParams('com_fabrik');
+			$requirejsBaseURI = $usersConfig->get('requirejs_base_uri', COM_FABRIK_LIVESITE);
+
+			if (empty($requirejsBaseURI))
+			{
+				$requirejsBaseURI = COM_FABRIK_LIVESITE;
+			}
+
+			$requirejsBaseURI = rtrim($requirejsBaseURI, '/') . '/';
+			static::$baseJSAssetURI = $requirejsBaseURI;
+		}
+		return static::$baseJSAssetURI;
+	}
+
+	/**
 	 * Ini the require JS configuration
 	 * Stores the shim and config to the session, which Fabrik system plugin
 	 * then uses to inject scripts into document.
@@ -1037,6 +1087,8 @@ if (!$j3)
 		$deps->deps = array();
 		$j3 = FabrikWorker::j3();
 		$ext = self::isDebug() ? '' : '-min';
+
+		$requirejsBaseURI = self::getJSAssetBaseURI();
 
 		// Load any previously created shim (e.g form which then renders list in outro text)
 		$newShim = $session->get('fabrik.js.shim', array());
@@ -1108,7 +1160,7 @@ if (!$j3)
 		$pathString = '{' . implode(',', $pathBits) . '}';
 		$config = array();
 		$config[] = "requirejs.config({";
-		$config[] = "\tbaseUrl: '" . COM_FABRIK_LIVESITE . "',";
+		$config[] = "\tbaseUrl: '" . $requirejsBaseURI . "',";
 		$config[] = "\tpaths: " . $pathString . ",";
 		$config[] = "\tshim: " . $shim . ',';
 		$config[] = "\twaitSeconds: 30,";
@@ -1291,6 +1343,29 @@ if (!$j3)
 		$debug = (int) $config->get('debug');
 
 		return $debug === 1 || $app->input->get('fabrikdebug', 0) == 1;
+	}
+
+	/**
+	 * Returns true if either J! system debug is true, and &fabrikdebug=2,
+	 * will then bypass ALL redirects, so we can see J! profile info.
+	 *
+	 * @return  bool
+	 */
+
+	public static function isDebugSubmit($enabled = false)
+	{
+		$app = JFactory::getApplication();
+		$config = JComponentHelper::getParams('com_fabrik');
+
+		if ($config->get('use_fabrikdebug') == 0)
+		{
+			return false;
+		}
+
+		$jconfig = JFactory::getConfig();
+		$debug = (int) $jconfig->get('debug');
+
+		return $debug === 1 && $app->input->get('fabrikdebug', 0) == 2;
 	}
 
 	/**
@@ -1706,7 +1781,9 @@ if (!$j3)
 
 		$app = JFactory::getApplication();
 		$package = $app->getUserState('com_fabrik.package', 'fabrik');
-		$json->url = 'index.php?option=com_' . $package . '&format=raw&view=plugin&task=pluginAjax&g=element&element_id=' . $elementid
+		$json->url = 'index.php?option=com_' . $package . '&format=raw';
+		$json->url .= $app->isAdmin() ? '&task=plugin.pluginAjax' : '&view=plugin&task=pluginAjax';
+		$json->url .= '&g=element&element_id=' . $elementid
 			. '&formid=' . $formid . '&plugin=' . $plugin . '&method=autocomplete_options&package=' . $package;
 		$c = JArrayHelper::getValue($opts, 'onSelection');
 
@@ -2170,7 +2247,7 @@ if (!$j3)
 	 * @since   3.0.7
 	 */
 
-	public static function runConentPlugins(&$text)
+	public static function runContentPlugins(&$text)
 	{
 		$app = JFactory::getApplication();
 		$input = $app->input;
@@ -2179,9 +2256,26 @@ if (!$j3)
 		$input->set('option', 'com_content');
 		$input->set('view', 'article');
 		jimport('joomla.html.html.content');
-		$text .= '{emailcloak=off}';
+
+		/**
+		 * J!'s email cloaking will cloak email addresses in form inputs, which is a Bad Thing<tm>.
+		 * What we really need to do is work out a way to prevent ONLY cloaking of emails in form inputs,
+		 * but that's not going to be trivial.  So bandaid is to turn it off in form and list views, so
+		 * addresses only get cloaked in details view.
+		 */
+
+		if ($view !== 'details')
+		{
+			$text .= '{emailcloak=off}';
+		}
+
 		$text = JHTML::_('content.prepare', $text);
-		$text = preg_replace('/\{emailcloak\=off\}/', '', $text);
+
+		if ($view !== 'details')
+		{
+			$text = FabrikString::rtrimword($text, '{emailcloak=off}');
+		}
+
 		$input->set('option', $opt);
 		$input->set('view', $view);
 	}
@@ -2190,13 +2284,15 @@ if (!$j3)
 	 * Get content item template
 	 *
 	 * @param   int  $contentTemplate  Joomla article id
+	 * @param	string	$part	which part, intro, full, or both
+	 * @param   bool  $runPlugins  run content plugins on the text
 	 *
 	 * @since   3.0.7
 	 *
 	 * @return  string  content item html
 	 */
 
-	public static function getContentTemplate($contentTemplate)
+	public function getContentTemplate($contentTemplate, $part = 'both', $runPlugins = false)
 	{
 		$app = JFactory::getApplication();
 
@@ -2215,7 +2311,25 @@ if (!$j3)
 			$res = $articleModel->getItem($contentTemplate);
 		}
 
-		return $res->introtext . ' ' . $res->fulltext;
+		if ($part == 'intro')
+		{
+			$res = $res->introtext;
+		}
+		else if ($part == 'full')
+		{
+			$res = $res->fulltext;
+		}
+		else
+		{
+			$res = $res->introtext . ' ' . $res->fulltext;
+		}
+
+		if ($runPlugins === true)
+		{
+			self::runContentPlugins($res);
+		}
+
+		return $res;
 	}
 
 	/**
@@ -2361,6 +2475,43 @@ if (!$j3)
 		}
 
 		return $tags;
+	}
+
+	/**
+	 * Return a set of attributes for an <a> tag
+	 *
+	 * @param string $title  title to use for popup image
+	 * @param string $group  grouping tag for next/prev, if applicable
+	 *
+	 */
+
+	public static function getLightboxAttributes($title = "", $group = "")
+	{
+		$fbConfig = JComponentHelper::getParams('com_fabrik');
+		$lightboxScript = $fbConfig->get('use_mediabox', '0');
+
+		$attrs = array();
+
+		switch ($lightboxScript)
+		{
+			case 0:
+			case 1:
+			default:
+				$attrs[] = "rel=lightbox{" . $group . "]";
+				break;
+			case 2:
+				$attrs[] = "data-rokbox";
+				if (!empty($title))
+				{
+					$attrs[] = 'data-rockbox-caption="' . addslashes($title) . '"';
+				}
+				if (!empty($group))
+				{
+					$attrs[] = 'data-rokbox-album="' . addslashes($group) . '"';
+				}
+				break;
+		}
+		return implode(' ', $attrs);
 	}
 
 	/**

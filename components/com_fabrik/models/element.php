@@ -574,6 +574,15 @@ class PlgFabrik_Element extends FabrikPlugin
 		$cleanDatas = array($this->getElement()->name . '_' . $cleanData, $cleanData);
 		$opts = array('forceImage' => true);
 
+		//If subdir is set prepend file name with subdirectory (so first search through [template folders]/subdir for icons, e.g. images/subdir)
+		$iconsubdir = $params->get('icon_subdir', '');
+		if ($iconsubdir != '')
+		{
+			$iconsubdir = rtrim($iconsubdir,'/') . '/';
+			$iconsubdir = ltrim($iconsubdir,'/');
+			array_unshift($cleanDatas, $iconsubdir.$cleanData); //search subdir first
+		}
+
 		foreach ($cleanDatas as $cleanData)
 		{
 			foreach ($this->imageExtensions as $ex)
@@ -1419,7 +1428,7 @@ class PlgFabrik_Element extends FabrikPlugin
 			$values = JArrayHelper::getValue($data, $name, $default);
 
 			// Querystring override (seems on http://fabrikar.com/subscribe/form/22 querystring var was not being set into $data)
-			if (JArrayHelper::getValue($opts, 'use_querystring', true))
+			if (JArrayHelper::getValue($opts, 'use_querystring', false))
 			{
 				if ((is_array($values) && empty($values)) || $values === '')
 				{
@@ -3207,7 +3216,7 @@ class PlgFabrik_Element extends FabrikPlugin
 				break;
 		}
 
-		$return[] = $normal ? $this->getFilterHiddenFields($counter, $elName) : $this->getAdvancedFilterHiddenFields();
+		$return[] = $normal ? $this->getFilterHiddenFields($counter, $elName, false, $normal) : $this->getAdvancedFilterHiddenFields();
 
 		return implode("\n", $return);
 	}
@@ -3487,8 +3496,10 @@ class PlgFabrik_Element extends FabrikPlugin
 			 * Paul - According to tooltip, $phpOpts should be of form "array(JHTML: :_('select.option', '1', 'one'))"
 			 * This is an array of objects with properties text and value.
 			 * If user has mis-specified this we should tell them.
+			 *
+			 * @FIXME - $$$ hugh - seems like an empty array should be valid as well?
 			 **/
-			if (!is_array($phpOpts) || !$phpOpts[0] || !is_object($phpOpts[0]) || !$phpOpts[0]->value || !$phpOpts[0]->text)
+			if (!is_array($phpOpts) || !$phpOpts[0] || !is_object($phpOpts[0]) || !isset($phpOpts[0]->value) || !isset($phpOpts[0]->text))
 			{
 				FabrikWorker::logError(sprintf(FText::_('COM_FABRIK_ELEMENT_SUBOPTION_ERROR'), $this->element->name, var_export($phpOpts, true)), 'error');
 
@@ -3528,8 +3539,10 @@ class PlgFabrik_Element extends FabrikPlugin
 			 * Paul - According to tooltip, $phpOpts should be of form "array(JHTML::_('select.option', '1', 'one'))"
 			 * This is an array of objects with properties text and value.
 			 * If user has mis-specified this we should tell them.
+			 *
+			 * @FIXME - $$$ hugh - seems like an empty array should be valid as well?
 			 **/
-			if (!is_array($phpOpts) || !$phpOpts[0] || !is_object($phpOpts[0]) || !$phpOpts[0]->value || !$phpOpts[0]->text)
+			if (!is_array($phpOpts) || !$phpOpts[0] || !is_object($phpOpts[0]) || !isset($phpOpts[0]->value) || !isset($phpOpts[0]->text))
 			{
 				FabrikWorker::logError(sprintf(FText::_('COM_FABRIK_ELEMENT_SUBOPTION_ERROR'), $this->element->name, var_export($phpOpts, true)), 'error');
 
@@ -3549,6 +3562,26 @@ class PlgFabrik_Element extends FabrikPlugin
 			$opt = FText::_($opt);
 		}
 
+		return $opts;
+	}
+	
+	/**
+	 * Get sub option enabled/disabled state
+	 *
+	 * @return  array
+	 */
+	
+	protected function getSubOptionEnDis()
+	{
+		$opts = array();
+		$phpOpts = $this->getPhpOptions();
+		if ($phpOpts)
+		{
+			foreach ($phpOpts as $phpOpt)
+			{
+				$opts[] = $phpOpt->disable;
+			}
+		}
 		return $opts;
 	}
 
@@ -3895,11 +3928,13 @@ class PlgFabrik_Element extends FabrikPlugin
 	 * @param   string  $elName   Full element name will be converted to tablename.elementname format
 	 * @param   bool    $hidden   Has the filter been added due to a search form value with no corresponding filter set up in the table
 	 * if it has we need to know so that when we do a search from a 'fabrik_list_filter_all' field that search term takes precedence
+	 * @param   bool  $normal   do we render as a normal filter or as an advanced search filter
+	 *
 	 *
 	 * @return  string	html Hidden fields
 	 */
 
-	protected function getFilterHiddenFields($counter, $elName, $hidden = false)
+	protected function getFilterHiddenFields($counter, $elName, $hidden = false, $normal = true)
 	{
 		$params = $this->getParams();
 		$element = $this->getElement();
@@ -3929,7 +3964,7 @@ class PlgFabrik_Element extends FabrikPlugin
 		 * Element filter not found (could be a prefilter instead) so use element default options
 		 * see http://fabrikar.com/forums/index.php?threads/major-filter-issues.37360/
 		 */
-		if ($filterIndex === false)
+		if ($filterIndex === false || $normal)
 		{
 			$condition = $this->getFilterCondition();
 			$eval = FABRIKFILTER_TEXT;
@@ -4311,6 +4346,9 @@ class PlgFabrik_Element extends FabrikPlugin
 			case 'nextmonth':
 				$query = ' (' . $key . ' >= DATE_ADD(LAST_DAY(now()), INTERVAL 1 DAY)  AND ' . $key
 				. ' <= DATE_ADD(LAST_DAY(NOW()), INTERVAL 1 MONTH) ) ';
+				break;
+			case 'birthday':
+				$query = '(MONTH(' . $key . ') = MONTH(CURDATE()) AND  DAY(' . $key . ') = DAY(CURDATE())) ';
 				break;
 			default:
 				if ($this->isJoin())
@@ -4818,7 +4856,7 @@ class PlgFabrik_Element extends FabrikPlugin
 		{
 			$pluginManager = FabrikWorker::getPluginManager();
 			$plugin = $pluginManager->getElementPlugin($splitSum);
-			$sql = $this->getSumQuery($listModel, $groupByLabels) . ' GROUP BY label';
+			$sql = $this->getSumQuery($listModel, $groupBys) . ' GROUP BY label';
 			$sql = $listModel->pluginQuery($sql);
 			$db->setQuery($sql);
 			$results2 = $db->loadObjectList('label');
@@ -5759,6 +5797,7 @@ class PlgFabrik_Element extends FabrikPlugin
 		 * which we need to deprecate.
 		 */
 		if (!array_key_exists($name, $formModel->formDataWithTableName))
+		//if ($this->dataConsideredEmpty(JArrayHelper::getValue($formModel->formDataWithTableName, $name, '')))
 		{
 			$this->getEmptyDataValue($data);
 		}

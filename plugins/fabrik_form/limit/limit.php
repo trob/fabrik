@@ -79,7 +79,10 @@ class PlgFabrik_FormLimit extends PlgFabrik_Form
 		}
 		else
 		{
-			$app->enqueueMessage(JText::sprintf('PLG_FORM_LIMIT_ENTRIES_LEFT_MESSAGE', $limit - $c, $limit));
+			if ($params->get('show_limit_message', true))
+			{
+				$app->enqueueMessage(JText::sprintf('PLG_FORM_LIMIT_ENTRIES_LEFT_MESSAGE', $limit - $c, $limit));
+			}
 		}
 
 		return true;
@@ -96,11 +99,34 @@ class PlgFabrik_FormLimit extends PlgFabrik_Form
 		$user = JFactory::getUser();
 		$params = $this->getParams();
 		$field = $params->get('limit_userfield');
+		$fk = $params->get('limit_fk');
+		$fkVal = '';
+
+		if (!empty($fk))
+		{
+			$fkVal = FArrayHelper::getValue(
+					$formModel->data,
+					FabrikString::safeColNameToArrayKey($fk),
+					FArrayHelper::getValue(
+							$formModel->data,
+							FabrikString::safeColNameToArrayKey($fk) . '_raw',
+							''
+					)
+			);
+		}
+
 		$listModel = $formModel->getlistModel();
 		$list = $listModel->getTable();
 		$db = $listModel->getDb();
 		$query = $db->getQuery(true);
 		$query->clear()->select(' COUNT(' . $field . ')')->from($list->db_table_name)->where($field . ' = ' . (int) $user->get('id'));
+
+		if (!empty($fkVal))
+		{
+			$query->where($db->quoteName($fk) . ' = ' . $db->quote($fkVal), 'AND');
+		}
+
+		$strq = (string) $query;
 		$db->setQuery($query);
 
 		return (int) $db->loadResult();

@@ -67,6 +67,7 @@ var FbGoogleMap = new Class({
 		'center': 0,
 		'reverse_geocode': false,
 		'use_radius': false,
+		'geocode_on_load': false,
 		'styles': []
 	},
 
@@ -99,13 +100,13 @@ var FbGoogleMap = new Class({
 			this.makeMap();
 
 			// @TODO test google object when offline typeOf(google) isnt working
-			if (this.options.center === 1 && this.options.rowid === '') {
+			if (this.options.center === 1 && (this.options.rowid === '' || this.options.rowid === 0)) {
 				if (geo_position_js.init()) {
 					geo_position_js.getCurrentPosition(this.geoCenter.bind(this), this.geoCenterErr.bind(this), {
 						enableHighAccuracy: true
 					});
 				} else {
-					fconsole('Geo locaiton functionality not available');
+					fconsole('Geo location functionality not available');
 				}
 			}
 
@@ -327,9 +328,12 @@ var FbGoogleMap = new Class({
 			}
 		}
 		this.watchTab();
-		Fabrik.addEvent('fabrik.form.page.chage.end', function (form) {
+		Fabrik.addEvent('fabrik.form.page.change.end', function (form) {
 			this.redraw();
 		}.bind(this));
+		if (this.options.geocode && this.options.geocode_on_load) {
+			this.geoCode();
+		}
 	},
 
 	radiusUpdatePosition: function () {

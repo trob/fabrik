@@ -329,8 +329,6 @@ class FabrikViewListBase extends JViewLegacy
 
 		foreach ($data as $groupk => $group)
 		{
-			$last_pk = '';
-			$last_i = 0;
 			$num_rows = 1;
 
 			foreach (array_keys($group) as $i)
@@ -570,6 +568,7 @@ class FabrikViewListBase extends JViewLegacy
 			$params->set('page_heading', $menu_params->get('page_heading'));
 			$params->set('show_page_heading', $menu_params->get('show_page_heading'));
 			$params->set('pageclass_sfx', $menu_params->get('pageclass_sfx'));
+			$params->set('page_title', $menu_params->get('page_title', $menu->title));
 		}
 		else
 		{
@@ -610,7 +609,7 @@ class FabrikViewListBase extends JViewLegacy
 
 		if ($params->get('process-jplugins'))
 		{
-			FabrikHelperHTML::runConentPlugins($text);
+			FabrikHelperHTML::runContentPlugins($text);
 		}
 
 		JDEBUG ? $profiler->mark('end fabrik display') : null;
@@ -628,7 +627,6 @@ class FabrikViewListBase extends JViewLegacy
 	protected function buttons()
 	{
 		$model = $this->getModel();
-		$params = $model->getParams();
 		$this->buttons = new stdClass;
 		$buttonProperties = array('class' => 'fabrikTip', 'opts' => "{notice:true}",
 			'title' => '<span>' . FText::_('COM_FABRIK_EXPORT_TO_CSV') . '</span>');

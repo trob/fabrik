@@ -19,6 +19,16 @@
 				repeat="true"
 				size="40" />
 				
+			<field name="show_limit_message"
+				type="radio"
+				class="btn-group"
+				description="PLG_FORM_LIMIT_SHOW_LIMIT_MESSAGE_DESC"
+				label="PLG_FORM_LIMIT_SHOW_LIMIT_MESSAGE_LABEL"
+				default="1">
+					<option value="0">JNO</option>
+					<option value="1">JYES</option>	
+			</field>
+				
 			<field name="limit_allow_anonymous"
 				type="radio"
 				class="btn-group"
@@ -38,7 +48,15 @@
 				description="PLG_FORM_LIMIT_LENGTH_DESC"
 				label="PLG_FORM_LIMIT_LENGTH_LABEL"
 				repeat="true" size="3" />
-				
+
+			<field name="limit_fk" 
+				type="listfields"
+				description="PLG_FORM_LIMIT_FK_DESC"
+				label="PLG_FORM_LIMIT_FK_LABEL"
+				onlytablefields="0"
+				repeat="true" 
+				valueformat="tableelement"/>
+							
 			<field name="OR" type="spacer"/>
 	
 			<field name="limit_connection"

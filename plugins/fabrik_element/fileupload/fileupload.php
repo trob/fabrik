@@ -430,6 +430,8 @@ class PlgFabrik_ElementFileupload extends PlgFabrik_Element
 		$opts->winHeight = (int) $params->get('win_height', 400);
 		$opts->elementShortName = $element->name;
 		$opts->listName = $this->getListModel()->getTable()->db_table_name;
+		$opts->useWIP = (bool) $params->get('upload_use_wip', '0') == '1';
+		
 		JText::script('PLG_ELEMENT_FILEUPLOAD_MAX_UPLOAD_REACHED');
 		JText::script('PLG_ELEMENT_FILEUPLOAD_DRAG_FILES_HERE');
 		JText::script('PLG_ELEMENT_FILEUPLOAD_UPLOAD_ALL_FILES');
@@ -904,7 +906,7 @@ class PlgFabrik_ElementFileupload extends PlgFabrik_Element
 			$render = $this->loadElement($data);
 		}
 
-		if (empty($data) || (!$skip_exists_check && !$storage->exists(COM_FABRIK_BASE . '/' . $data)))
+		if (empty($data) || (!$skip_exists_check && !$storage->exists($data)))
 		{
 			$render->output = '';
 		}
@@ -1940,6 +1942,8 @@ class PlgFabrik_ElementFileupload extends PlgFabrik_Element
 
 	protected function _getFilePath($repeatCounter = 0)
 	{
+		$params = $this->getParams();
+
 		if (!isset($this->_filePaths))
 		{
 			$this->_filePaths = array();
@@ -1953,7 +1957,7 @@ class PlgFabrik_ElementFileupload extends PlgFabrik_Element
 			 * to rebuild it.  For instance, if the element data is changed by a onBeforeProcess
 			 * submission plugin, or by a 'replace' validation.
 			 */
-			if (!FabrikString::usesElementPlaceholders($this->_filePaths[$repeatCounter]))
+			if (!FabrikString::usesElementPlaceholders($params->get('ul_directory')))
 			{
 				return $this->_filePaths[$repeatCounter];
 			}
@@ -1963,7 +1967,6 @@ class PlgFabrik_ElementFileupload extends PlgFabrik_Element
 		$aData = $filter->clean($_POST, 'array');
 		$elName = $this->getFullName(true, false);
 		$elNameRaw = $elName . '_raw';
-		$params = $this->getParams();
 
 		// @TODO test with fileuploads in join groups
 		$groupModel = $this->getGroup();
@@ -2047,6 +2050,8 @@ class PlgFabrik_ElementFileupload extends PlgFabrik_Element
 		$groupModel = $this->getGroup();
 		$element = $this->getElement();
 		$params = $this->getParams();
+		
+		$use_wip = $params->get('upload_use_wip', '0') == '1';
 
 		if ($element->hidden == '1')
 		{
@@ -2131,7 +2136,15 @@ class PlgFabrik_ElementFileupload extends PlgFabrik_Element
 
 				$render = $this->loadElement($value);
 
-				if ($value != '' && ($storage->exists(COM_FABRIK_BASE . $value) || JString::substr($value, 0, 4) == 'http'))
+				if (
+					$use_wip
+					|| (
+						$value != '' 
+						&& (
+							$storage->exists(COM_FABRIK_BASE . $value)
+							|| JString::substr($value, 0, 4) == 'http')
+						)
+					)
 				{
 					$render->render($this, $params, $value);
 				}
@@ -2140,7 +2153,15 @@ class PlgFabrik_ElementFileupload extends PlgFabrik_Element
 				{
 					if ($this->isEditable())
 					{
-						$render->output = '<span class="fabrikUploadDelete" id="' . $id . '_delete_span">' . $this->deleteButton($value) . $render->output . '</span>';
+						// $$$ hugh - TESTING - using HTML5 to show a selected image, so if no file, still need the span, hidden, but not the actual delete button
+						if ($use_wip && empty($value))
+						{
+							$render->output = '<span class="fabrikUploadDelete fabrikHide" id="' . $id . '_delete_span">' . $render->output . '</span>';
+						}
+						else
+						{
+							$render->output = '<span class="fabrikUploadDelete" id="' . $id . '_delete_span">' . $this->deleteButton($value) . $render->output . '</span>';
+						}
 					}
 
 					$allRenders[] = $render->output;
@@ -2359,129 +2380,29 @@ class PlgFabrik_ElementFileupload extends PlgFabrik_Element
 	protected function plupload($str, $repeatCounter, $values)
 	{
 		FabrikHelperHTML::stylesheet(COM_FABRIK_LIVESITE . 'media/com_fabrik/css/slider.css');
-		$id = $this->getHTMLId($repeatCounter);
-		$j3 = FabrikWorker::j3();
 		$params = $this->getParams();
-		$winWidth = $params->get('win_width', 400);
-		$winHeight = $params->get('win_height', 400);
-		$runtimes = $params->get('ajax_runtime', 'html5,html4');
 		$w = (int) $params->get('ajax_dropbox_width', 0);
 		$h = (int) $params->get('ajax_dropbox_hight', 200);
-		$dropBoxStyle = 'height:' . $h . 'px';
+		$dropBoxStyle = 'height:' . $h . 'px;';
 
 		if ($w !== 0)
 		{
 			$dropBoxStyle .= 'width:' . $w . 'px;';
 		}
 
-		// Add span with id so that element fxs work.
-		$pstr = array();
-		$pstr[] = '<span id="' . $id . '"></span>';
-		$pstr[] = '<div id="' . $id . '-widgetcontainer">';
-		$pstr[] = '<canvas id="' . $id . '-widget" width="' . $winWidth . '" height="' . $winHeight . '"></canvas>';
+		$basePath = COM_FABRIK_BASE . '/plugins/fabrik_element/fileupload/layouts/';
+		$layout = new JLayoutFile('fileupload-widget', $basePath, array('debug' => false, 'component' => 'com_fabrik', 'client' => 'site'));
 
-		if ($this->canCrop())
-		{
-			$pstr[] = '<div class="zoom" style="float:left;margin-top:10px;padding-right:10x;width:180px">';
-			$pstr[] = '	zoom:';
-			$pstr[] = '	<div class="fabrikslider-line" style="width: 100px;float:left;">';
-			$pstr[] = '		<div class="knob"></div>';
-			$pstr[] = '	</div>';
-			$pstr[] = '	<input name="zoom-val" value="" size="3"  class="input-mini"/>';
-			$pstr[] = '</div>';
-			$pstr[] = '<div class="rotate" style="float:left;margin-top:10px;width:180px">' . FText::_('PLG_ELEMENT_FILEUPLOAD_ROTATE') . ':';
-			$pstr[] = '	<div class="fabrikslider-line" style="width: 100px;float:left;">';
-			$pstr[] = '		<div class="knob"></div>';
-			$pstr[] = '	</div>';
-			$pstr[] = '	<input name="rotate-val" value="" size="3"  class="input-mini"/>';
-			$pstr[] = '</div>';
-		}
-
-		if (FabrikHelperHTML::canvasSupport())
-		{
-			$pstr[] = '<div style="text-align: right;float:right;margin:10px 0; width: 205px">';
-			$pstr[] = '<input type="button" class="button btn btn-primary" name="close-crop" value="' . FText::_('CLOSE') . '" />';
-			$pstr[] = '</div>';
-		}
-
-		$pstr[] = '</div>';
-
-
-		$pstr[] = '<div class="plupload_container fabrikHide" id="' . $id . '_container" style="' . $dropBoxStyle . '">';
-		$pstr[] = '<div class="plupload" id="' . $id . '_dropList_container">';
-		if ($j3)
-		{
-		$pstr[] = '	<table class="table table-striped table-condensed">';
-		$pstr[] = '		<thead style="display:none"><tr>';
-		$pstr[] = '			<th class="span4">' . FText::_('PLG_ELEMENT_FILEUPLOAD_FILENAME') . '</th>';
-		$pstr[] = '			<th class="span1 plupload_crop">&nbsp;</th>';
-		$pstr[] = '			<th class="span5 plupload_file_status"></th>';
-		$pstr[] = '			<th class="span1 plupload_file_action">&nbsp;</th>';
-		$pstr[] = '		</tr></thead>';
-		$pstr[] = '		<tbody class="plupload_filelist" id="' . $id . '_dropList">';
-		$pstr[] = ' </tbody>';
-		$pstr[] = ' <tfoot><tr><td colspan="4">';
-		$pstr[] = '				<a id="' . $id . '_browseButton" class="btn btn-mini" href="#"><i class="icon-plus-sign icon-plus"></i>'
-				. FText::_('PLG_ELEMENT_FILEUPLOAD_ADD_FILES') . '</a>';
-		$pstr[] = '				<a id="' . $id . '_startButton" class="btn btn-mini disabled plupload_start" data-action="plupload_start" href="#"><i class="icon-upload"></i>'
-				. FText::_('PLG_ELEMENT_FILEUPLOAD_START_UPLOAD') . '</a>';
-		$pstr[] = '			<span class="plupload_upload_status"></span>';
-		$pstr[] = '</td></tr></tfoot>';
-		$pstr[] = '	</table>';
-		}
-		else
-		{
-			$pstr[] = '	<div class="plupload_header">';
-			$pstr[] = '		<div class="plupload_header_content">';
-			$pstr[] = '			<div class="plupload_header_title">' . FText::_('PLG_ELEMENT_FILEUPLOAD_PLUP_HEADING') . '</div>';
-			$pstr[] = '			<div class="plupload_header_text">' . FText::_('PLG_ELEMENT_FILEUPLOAD_PLUP_SUB_HEADING') . '</div>';
-			$pstr[] = '		</div>';
-			$pstr[] = '	</div>';
-			$pstr[] = '	<div class="plupload_content">';
-			$pstr[] = '		<div class="plupload_filelist_header">';
-			$pstr[] = '			<div class="plupload_file_name">' . FText::_('PLG_ELEMENT_FILEUPLOAD_FILENAME') . '</div>';
-			$pstr[] = '			<div class="plupload_file_action">&nbsp;</div>';
-			$pstr[] = '			<div class="plupload_file_status"><span>' . FText::_('PLG_ELEMENT_FILEUPLOAD_STATUS') . '</span></div>';
-			$pstr[] = '			<div class="plupload_file_size">' . FText::_('PLG_ELEMENT_FILEUPLOAD_SIZE') . '</div>';
-			$pstr[] = '			<div class="plupload_clearer">&nbsp;</div>';
-			$pstr[] = '		</div>';
-			$pstr[] = '		<ul class="plupload_filelist" id="' . $id . '_dropList">';
-			$pstr[] = '		</ul>';
-			$pstr[] = '		<div class="plupload_filelist_footer">';
-			$pstr[] = '		<div class="plupload_file_name">';
-			$pstr[] = '			<div class="plupload_buttons">';
-			$pstr[] = '				<a id="' . $id . '_browseButton" class="plupload_button plupload_add" href="#">'
-					. FText::_('PLG_ELEMENT_FILEUPLOAD_ADD_FILES') . '</a>';
-			$pstr[] = '				<a id="' . $id . '_startButton" class="plupload_button plupload_start plupload_disabled" href="#">'
-					. FText::_('PLG_ELEMENT_FILEUPLOAD_START_UPLOAD') . '</a>';
-			$pstr[] = '			</div>';
-			$pstr[] = '			<span class="plupload_upload_status"></span>';
-			$pstr[] = '		</div>';
-			$pstr[] = '		<div class="plupload_file_action"></div>';
-			$pstr[] = '			<div class="plupload_file_status">';
-			$pstr[] = '				<span class="plupload_total_status"></span>';
-			$pstr[] = '			</div>';
-			$pstr[] = '		<div class="plupload_file_size">';
-			$pstr[] = '			<span class="plupload_total_file_size"></span>';
-			$pstr[] = '		</div>';
-			$pstr[] = '		<div class="plupload_progress">';
-			$pstr[] = '			<div class="plupload_progress_container">';
-			$pstr[] = '			<div class="plupload_progress_bar"></div>';
-			$pstr[] = '		</div>';
-			$pstr[] = '	</div>';
-			$pstr[] = '	<div class="plupload_clearer">&nbsp;</div>';
-			$pstr[] = '	</div>';
-
-			FabrikHelperHTML::stylesheet(COM_FABRIK_LIVESITE . 'plugins/fabrik_element/fileupload/lib/plupload/css/plupload.queue.css');
-		}
-
-		$pstr[] = '	</div>';
-		$pstr[] = '</div>';
-		$pstr[] = '<!-- FALLBACK; SHOULD LOADING OF PLUPLOAD FAIL -->';
-		$pstr[] = '<div class="plupload_fallback">' . FText::_('PLG_ELEMENT_FILEUPLOAD_FALLBACK_MESSAGE');
-		$pstr[] = '<br />';
-		array_merge($pstr, $str);
-		$pstr[] = '</div>';
+		$data = array();
+		$data['id'] = $this->getHTMLId($repeatCounter);
+		$data['winWidth'] = $params->get('win_width', 400);
+		$data['winHeight'] = $params->get('win_height', 400);
+		$data['canCrop'] = $this->canCrop();
+		$data['canvasSupport'] = FabrikHelperHTML::canvasSupport();
+		$data['dropBoxStyle'] = $dropBoxStyle;
+		$data['field'] = implode("\n", $str);
+		$data['j3'] = FabrikWorker::j3();
+		$pstr = (array) $layout->render($data);
 
 		return $pstr;
 	}
@@ -2549,12 +2470,20 @@ class PlgFabrik_ElementFileupload extends PlgFabrik_Element
 		// @TODO test in join
 		if (array_key_exists('file', $_FILES) || array_key_exists('join', $_FILES))
 		{
+			/*
 			$file = array('name' => $isjoin ? $_FILES['join']['name'][$joinid] : $_FILES['file']['name'],
 					'type' => $isjoin ? $_FILES['join']['type'][$joinid] : $_FILES['file']['type'],
 					'tmp_name' => $isjoin ? $_FILES['join']['tmp_name'][$joinid] : $_FILES['file']['tmp_name'],
 					'error' => $isjoin ? $_FILES['join']['error'][$joinid] : $_FILES['file']['error'],
 					'size' => $isjoin ? $_FILES['join']['size'][$joinid] : $_FILES['file']['size']);
-
+			*/
+			$file = array(
+				'name' => $_FILES['file']['name'],
+				'type' => $_FILES['file']['type'],
+				'tmp_name' => $_FILES['file']['tmp_name'],
+				'error' => $_FILES['file']['error'],
+				'size' => $_FILES['file']['size']
+			);
 			$filepath = $this->_processIndUpload($file, '', 0);
 			$uri = $this->getStorage()->pathToURL($filepath);
 			$o->filepath = $filepath;
@@ -3190,4 +3119,45 @@ class PlgFabrik_ElementFileupload extends PlgFabrik_Element
 
 		return $rendered;
 	}
+	
+	/**
+	 * run on formModel::setFormData()
+	 * TESTING - stick the filename (if it's there) in to the formData, so things like validations
+	 * can see it.  Not sure yet if this will mess with the rest of the code.  And I'm sure it'll get
+	 * horribly funky, judging by the code in processUpload!  But hey, let's have a hack at it
+	 *
+	 * @param   int  $c  Repeat group counter
+	 *
+	 * @return void
+	 */
+	
+	public function preProcess_off($c)
+	{
+		$params = $this->getParams();
+		$w = new FabrikWorker;
+		$form = $this->getForm();
+		$data = unserialize(serialize($form->formData));
+		$group = $this->getGroup();
+	
+		/**
+		 * get the key name in dot format for updateFormData method
+		 * $$$ hugh - added $rawkey stuff, otherwise when we did "$key . '_raw'" in the updateFormData
+		 * below on repeat data, it ended up in the wrong format, like join.XX.table___element.0_raw
+		*/
+		$key = $this->getFullName(true, false);
+		$shortkey = $this->getFullName(true, false);
+		$rawkey = $key . '_raw';
+	
+		if (!$group->canRepeat())
+		{
+			if (!$this->isRepeatElement())
+			{
+				$farray = JArrayHelper::getValue($_FILES, $key, array(), 'array');
+				$fname = JArrayHelper::getValue($farray, 'name');
+				$form->updateFormData($key, $fname);
+				$form->updateFormData($rawkey, $fname);
+			}
+		}
+	}
+	
 }

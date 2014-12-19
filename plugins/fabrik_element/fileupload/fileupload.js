@@ -15,6 +15,11 @@ var FbFileUpload = new Class({
 			this.ajaxFolder();
 		}
 
+		// New "work in progress" feature using HTML5 to show new (image file) selection in browser
+		if (this.options.useWIP && !this.options.ajax_upload && this.options.editable !== false) {
+			this.watchBrowseButton();
+		}
+		
 		if (this.options.ajax_upload && this.options.editable !== false) {
 			this.watchAjax();
 			this.options.files = $H(this.options.files);
@@ -41,7 +46,7 @@ var FbFileUpload = new Class({
 	},
 	
 	/**
-	 * Repoistion the hidden input field over teh 'add' button. Called on initiate
+	 * Repoistion the hidden input field over the 'add' button. Called on initiate
 	 * and if in a tab and the tab is activated. Triggered from element.watchTab()
 	 */
 	redraw: function () {
@@ -60,6 +65,38 @@ var FbFileUpload = new Class({
 		}
 	},
 
+	watchBrowseButton: function () {
+		if (window.File && window.FileReader && window.FileList && window.Blob) {
+			document.id(this.element.id).addEvent('change', function (evt) {
+				var files = evt.target.files;
+				for (var i = 0, f; f = files[i]; i++) {
+					// Only process image files.
+					if (!files[0].type.match('image.*')) {
+						continue;
+					}
+					var reader = new FileReader();
+					// Closure to capture the file information.
+					reader.onload = (function (theFile) {
+						return function (e) {
+							var c = this.getContainer();
+							if (!c) {
+								return;
+							}
+							var b = c.getElement('img');
+							b.src = e.target.result;
+							var d = b.findClassUp('fabrikHide');
+							if (d) {
+								d.removeClass('fabrikHide');
+							}
+						}.bind(this);
+					}.bind(this))(f);
+					// Read in the image file as a data URL.
+					reader.readAsDataURL(f);
+				}
+			}.bind(this));
+		}
+	},
+	
 	/**
 	 * Single file uploads can allow the user to delee the reference and/or file
 	 */
@@ -1083,8 +1120,8 @@ var ImageWidget = new Class({
 		}
 		var x = this.cropperCanvas.x;
 		var y = this.cropperCanvas.y;
-		var w = this.cropperCanvas.w;
-		var h = this.cropperCanvas.h;
+		var w = this.cropperCanvas.w - 2;
+		var h = this.cropperCanvas.h - 2;
 		x = x - (w / 2);
 		y = y - (h / 2);
 
@@ -1102,7 +1139,6 @@ var ImageWidget = new Class({
 		var f = document.getElements('input[name*=' + file + ']').filter(function (fld) {
 			return fld.name.contains('cropdata');
 		});
-
 
 		ctx.drawImage(canvas, x, y, w, h, 0, 0, w, h);
 		f.set('value', target.toDataURL());

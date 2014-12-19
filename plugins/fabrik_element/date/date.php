@@ -832,7 +832,9 @@ class PlgFabrik_ElementDate extends PlgFabrik_ElementList
 		$id = $this->getHTMLId($repeatCounter);
 		$opts = $this->getElementJSOptions($repeatCounter);
 		$opts->hidden = (bool) $this->getElement()->hidden;
-		$opts->defaultVal = $this->offsetDate;
+
+		// Used uniquely in reset();
+		$opts->defaultVal = $this->getFrontDefaultValue();
 		$opts->showtime = (!$element->hidden && $params->get('date_showtime', 0)) ? true : false;
 		$opts->timelabel = FText::_('time');
 		$opts->typing = (bool) $params->get('date_allow_typing_in_field', true);
@@ -1033,7 +1035,8 @@ class PlgFabrik_ElementDate extends PlgFabrik_ElementList
 		$formModel = $this->getFormModel();
 		$value = parent::getValue($data, $repeatCounter, $opts);
 		$db = FabrikWorker::getDbo();
-		$input = JFactory::getApplication()->input;
+		$app = JFactory::getApplication();
+		$input = $app->input;
 
 		if (is_array($value))
 		{
@@ -1041,7 +1044,11 @@ class PlgFabrik_ElementDate extends PlgFabrik_ElementList
 			$value = JArrayHelper::getValue($value, 'date', JArrayHelper::getValue($value, 0));
 		}
 
-		if ($input->get('task') == 'form.process')
+		// in some corner cases, date will be db name quoted, like in CSV export after an advanced search!
+		$value = trim($value, "'");
+
+		//if ($input->get('task') == 'form.process' || ($app->isAdmin() && $input->get('task') == 'process'))
+		if (FabrikWorker::inFormProcess())
 		{
 			// Don't mess with posted value - can cause double offsets - instead do in _indStoareDBFormat();
 			return $value;
@@ -1594,7 +1601,7 @@ class PlgFabrik_ElementDate extends PlgFabrik_ElementList
 
 		if ($normal)
 		{
-			$return[] = $this->getFilterHiddenFields($counter, $elName);
+			$return[] = $this->getFilterHiddenFields($counter, $elName, false, $normal);
 		}
 		else
 		{
@@ -2016,6 +2023,9 @@ class PlgFabrik_ElementDate extends PlgFabrik_ElementList
 				$query = ' (' . $key . ' >= DATE_ADD(LAST_DAY(now()), INTERVAL 1 DAY)  AND ' . $key
 					. ' <= DATE_ADD(LAST_DAY(NOW()), INTERVAL 1 MONTH) ) ';
 				break;
+			case 'birthday':
+				$query = '(MONTH(' . $key . ') = MONTH(CURDATE()) AND  DAY(' . $key . ') = DAY(CURDATE())) ';
+				break;
 
 			default:
 				$params = $this->getParams();
@@ -2392,6 +2402,35 @@ class PlgFabrik_ElementDate extends PlgFabrik_ElementList
 		// Return false, as we need to be called on per-element (not per-plugin) basis
 		return false;
 	}
+
+
+	/**
+	 * Get the Front end JS default date
+	 *
+	 * @param   array  $data  Form data
+	 *
+	 * @return string
+	 */
+
+	public function getFrontDefaultValue($data = array())
+	{
+		$params = $this->getParams();
+		$db = JFactory::getDbo();
+		$alwaysToday = $params->get('date_alwaystoday', false);
+		$defaultToday = $params->get('date_defaulttotoday', false);
+		$formModel = $this->getFormModel();
+
+		if ($alwaysToday || $defaultToday)
+		{
+			$this->default = JHtml::_('date', 'now', $db->getDateFormat());
+		}
+		else
+		{
+			$this->default = parent::getDefaultValue($data);
+		}
+
+		return $this->default;
+	}
 }
 
 /**
@@ -2580,4 +2619,5 @@ class FabDate extends JDate
 
 		return $str;
 	}
+
 }

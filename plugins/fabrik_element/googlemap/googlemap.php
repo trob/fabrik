@@ -280,6 +280,14 @@ class PlgFabrik_ElementGooglemap extends PlgFabrik_Element
 		$opts->geocode = $params->get('fb_gm_geocode', '0');
 		$opts->geocode_event = $params->get('fb_gm_geocode_event', 'button');
 		$opts->geocode_fields = array();
+		// geocode_on_load, 0 = no, 1 = new, 2 = edit, 3 = always
+		$geocode_on_load = $params->get('fb_gm_geocode_on_load', '0');
+		$opts->geocode_on_load = $this->isEditable() && 
+				(
+					($geocode_on_load == 1 && $formModel->isNewRecord())
+					|| ($geocode_on_load == 2 && !$formModel->isNewRecord())
+					|| $geocode_on_load == 3
+				);
 		$opts->auto_center = (bool) $params->get('fb_gm_auto_center', false);
 		$opts->styles = FabGoogleMapHelper::styleJs($params);
 
@@ -576,14 +584,23 @@ class PlgFabrik_ElementGooglemap extends PlgFabrik_Element
 		$id = $this->getHTMLId($repeatCounter);
 		$params = $this->getParams();
 
+		/**
+		 * Width and height MUST be specified or static map call will fail.  But as we allow for
+		 * leaving these params blank to get a 100% size full map, we have to set a default when
+		 * building a static map.  Only real solution is to add YAFOs for "Static map width" and height.
+		 * But for now, just default to 200x150.
+		 */
+
 		if (is_null($w))
 		{
-			$w = $params->get('fb_gm_mapwidth');
+			$w = $params->get('fb_gm_mapwidth', '200');
+			$w = empty($w) ? '200' : $w;
 		}
 
 		if (is_null($h))
 		{
-			$h = $params->get('fb_gm_mapheight');
+			$h = $params->get('fb_gm_mapheight', '150');
+			$h = empty($h) ? '150' : $h;
 		}
 
 		if (is_null($z))

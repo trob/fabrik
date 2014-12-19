@@ -276,6 +276,16 @@ class FabrikFEModelForm extends FabModelForm
 	public $formPluginShim = array();
 
 	/**
+	 * JS options on load, only used when calling onJSOpts plugin
+	 * so plugin code can access and modify them
+	 *
+	 * @since 3.2
+	 *
+	 * @var array
+	 */
+	public $jsOpts = null;
+
+	/**
 	 * Constructor
 	 *
 	 * @param   array  $config  An array of configuration options (name, state, dbo, table_path, ignore_request).
@@ -538,8 +548,18 @@ class FabrikFEModelForm extends FabModelForm
 			 * If FabrikHelperHTML::styleSheetajax loaded then don't do &amp;
 			 */
 			$view = $this->isEditable() ? 'form' : 'details';
-			$qs .= FabrikHelperHTML::cssAsAsset() ? '&view=' . $v : '&amp;view=' . $v;
-			$qs .= '&amp;rowid=' . $this->getRowId();
+
+			if (FabrikHelperHTML::cssAsAsset())
+			{
+				$qs .= '&view=' . $v;
+				$qs .= '&rowid=' . $this->getRowId();
+			}
+			else
+			{
+				$qs .= '&amp;view=' . $v;
+				$qs .= '&amp;rowid=' . $this->getRowId();
+			}
+
 			$tmplPath = 'templates/' . $app->getTemplate() . '/html/com_fabrik/' . $view . '/' . $tmpl . '/template_css.php' . $qs;
 
 			if (!FabrikHelperHTML::stylesheetFromPath($tmplPath))
@@ -1157,6 +1177,9 @@ class FabrikFEModelForm extends FabModelForm
 
 	public function process()
 	{
+		$profiler = JProfiler::getInstance('Application');
+		JDEBUG ? $profiler->mark('process: start') : null;
+
 		$app = JFactory::getApplication();
 		$input = $app->input;
 
@@ -1174,21 +1197,27 @@ class FabrikFEModelForm extends FabModelForm
 		 * now looks at origRowId
 		 */
 		$this->origRowId = $this->rowId;
+
+		JDEBUG ? $profiler->mark('process, getGroupsHiarachy: start') : null;
 		$this->getGroupsHiarachy();
 
 		if ($form->record_in_database == '1')
 		{
+			JDEBUG ? $profiler->mark('process, setOrigData: start') : null;
 			$this->setOrigData();
 		}
 
+		JDEBUG ? $profiler->mark('process, onBeforeProcess plugins: start') : null;
 		if (in_array(false, $pluginManager->runPlugins('onBeforeProcess', $this)))
 		{
 			return false;
 		}
 
 		$this->removeEmptyNoneJoinedGroupData($this->formData);
+		JDEBUG ? $profiler->mark('process, setFormData: start') : null;
 		$this->setFormData();
 
+		JDEBUG ? $profiler->mark('process, _doUpload: start') : null;
 		if (!$this->_doUpload())
 		{
 			return false;
@@ -1198,6 +1227,7 @@ class FabrikFEModelForm extends FabModelForm
 		 * this->setFormData();
 		 */
 
+		JDEBUG ? $profiler->mark('process, onBeforeStore plugins: start') : null;
 		if (in_array(false, $pluginManager->runPlugins('onBeforeStore', $this)))
 		{
 			return false;
@@ -1216,8 +1246,10 @@ class FabrikFEModelForm extends FabModelForm
 
 		// $$$rob run this before as well as after onAfterProcess (ONLY for redirect plugin)
 		// so that any redirect urls are available for the plugin (e.g twitter)
+		JDEBUG ? $profiler->mark('process, onLastProcess plugins: start') : null;
 		$pluginManager->runPlugins('onLastProcess', $this);
 
+		JDEBUG ? $profiler->mark('process, onAfterProcess plugins: start') : null;
 		if (in_array(false, $pluginManager->runPlugins('onAfterProcess', $this)))
 		{
 			// $$$ rob this no longer stops default redirect (not needed any more)
@@ -1228,6 +1260,7 @@ class FabrikFEModelForm extends FabModelForm
 		$sessionModel->remove();
 
 		// $$$rob used ONLY for redirect plugins
+		JDEBUG ? $profiler->mark('process, onLastProcess plugins: start') : null;
 		if (in_array(false, $pluginManager->runPlugins('onLastProcess', $this)))
 		{
 			// $$$ rob this no longer stops default redirect (not needed any more)
@@ -1240,6 +1273,8 @@ class FabrikFEModelForm extends FabModelForm
 		// Clean both admin and front end cache.
 		parent::cleanCache('com_' . $package, 1);
 		parent::cleanCache('com_' . $package, 0);
+
+		JDEBUG ? $profiler->mark('process: end') : null;
 
 		return true;
 	}
@@ -1786,6 +1821,9 @@ class FabrikFEModelForm extends FabModelForm
 
 	public function processToDB()
 	{
+		$profiler = JProfiler::getInstance('Application');
+		JDEBUG ? $profiler->mark('processToDb: start') : null;
+
 		$pluginManager = FabrikWorker::getPluginManager();
 		$app = JFactory::getApplication();
 		$input = $app->input;
@@ -1793,22 +1831,31 @@ class FabrikFEModelForm extends FabModelForm
 		$item = $listModel->getTable();
 		$origid = $this->prepareForCopy();
 		$this->formData = $listModel->removeTableNameFromSaveData($this->formData, '___');
+
+		JDEBUG ? $profiler->mark('processToDb, submitToDatabase: start') : null;
 		$insertId = $this->storeMainRow ? $this->submitToDatabase($this->rowId) : $this->rowId;
+
 		$this->updateRefferrer($origid, $insertId);
 		$this->setInsertId($insertId);
 
 		// Store join data
+		JDEBUG ? $profiler->mark('processToDb, processGroups: start') : null;
 		$this->processGroups();
 
 		// Enable db join checkboxes in repeat groups to save data
+		JDEBUG ? $profiler->mark('processToDb, processElements: start') : null;
 		$this->processElements();
 
+		JDEBUG ? $profiler->mark('processToDb, onBeforeCalculations plugins: start') : null;
 		if (in_array(false, $pluginManager->runPlugins('onBeforeCalculations', $this)))
 		{
 			return $insertId;
 		}
 
+		JDEBUG ? $profiler->mark('processToDb, doCalculations: start') : null;
 		$this->listModel->doCalculations();
+
+		JDEBUG ? $profiler->mark('processToDb: end') : null;
 		return $insertId;
 	}
 
@@ -1981,12 +2028,13 @@ class FabrikFEModelForm extends FabModelForm
 								// $$$ rob urldecode when posting from ajax form
 								$encrypted = urldecode($encrypted);
 								$v = empty($encrypted) ? '' : $crypt->decrypt($encrypted);
-								/* $$$ hugh - things like elementlist elements (radios, etc) seem to use
+
+								/*
+								 * $$$ hugh - things like elementlist elements (radios, etc) seem to use
 								 * their JSON data for encrypted read only vals, need to decode.
 								 */
-								$class_name = get_parent_class($elementModel);
 
-								if ($class_name === 'PlgFabrik_ElementList')
+								if (is_subclass_of($elementModel, 'PlgFabrik_ElementList'))
 								{
 									$v = FabrikWorker::JSONtoData($v, true);
 								}
@@ -2324,7 +2372,7 @@ class FabrikFEModelForm extends FabModelForm
 		}
 
 		FabrikHelperHTML::debug($this->errors, 'form:errors');
-		///echo "<pre>";print_r($this->errors);exit;
+		//echo "<pre>";print_r($this->errors);exit;
 		$this->setErrors($this->errors);
 
 		return $ok;
@@ -2345,7 +2393,7 @@ class FabrikFEModelForm extends FabModelForm
 		$package = $app->getUserState('com_fabrik.package', 'fabrik');
 		$context = 'com_' . $package . '.form.' . $this->getId() . '.' . $this->getRowId() . '.';
 		$session = JFactory::getSession();
-
+echo "form get errors";
 		// Store errors in local array as clearErrors() removes $this->errors
 		$errors = array();
 
@@ -2353,6 +2401,7 @@ class FabrikFEModelForm extends FabModelForm
 		{
 			if ($this->isMambot)
 			{
+				echo "is mambot<br>";
 				$errors = $session->get($context . 'errors', array());
 			}
 		}
@@ -2881,6 +2930,15 @@ class FabrikFEModelForm extends FabModelForm
 			$this->rowId = '';
 		}
 
+		/**
+		 * $$$ hugh - there's a couple of places, like calendar viz, that add &rowid=0 to
+		 * query string for new form, so check for that and set to empty string.
+		 */
+		if ($this->rowId === '0')
+		{
+			$this->rowId = '';
+		}
+
 		FabrikWorker::getPluginManager()->runPlugins('onSetRowId', $this);
 
 		return $this->rowId;
@@ -2972,7 +3030,6 @@ class FabrikFEModelForm extends FabModelForm
 
 	public function hasErrors()
 	{
-		$errorsFound = !empty($this->errors);
 		$errorsFound = false;
 
 		foreach ($this->errors as $field => $errors)
@@ -3217,7 +3274,7 @@ class FabrikFEModelForm extends FabModelForm
 							else
 							{
 								// If no key found set rowid to 0 so we can insert a new record.
-								if (empty($usekey) && !$this->isMambot)
+								if (empty($usekey) && !$this->isMambot && in_array($input->get('view'), array('form', 'details')))
 								{
 									$this->rowId = '';
 									/**
@@ -5327,5 +5384,49 @@ class FabrikFEModelForm extends FabModelForm
 		}
 
 		return $key;
+	}
+
+	/**
+	 * Get a subset of the model's data with non accessible values removed
+	 *
+	 * @param   string  $view  View
+	 *
+	 * @return  array data
+	 */
+	public function accessibleData($view = 'form')
+	{
+		$accessibleData = $this->data;
+
+		$groups = $this->getGroupsHiarachy();
+
+		foreach ($groups as $groupModel)
+		{
+			$elementModels = $groupModel->getPublishedElements();
+
+			foreach ($elementModels as $elementModel)
+			{
+				switch ($view)
+				{
+					case 'form':
+						$accessible = $elementModel->canUse($view);
+						break;
+					case 'details':
+						$accessible = $elementModel->canView('form');
+						break;
+					case 'list':
+						$accessible = $elementModel->canView('list');
+						break;
+				}
+
+				if (!$accessible)
+				{
+					$name = $elementModel->getFullName(true, false);
+					unset($accessibleData[$name]);
+					unset($accessibleData[$name . '_raw']);
+				}
+			}
+		}
+
+		return $accessibleData;
 	}
 }

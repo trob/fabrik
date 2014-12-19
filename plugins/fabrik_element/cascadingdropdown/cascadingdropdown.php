@@ -1234,12 +1234,28 @@ class PlgFabrik_ElementCascadingdropdown extends PlgFabrik_ElementDatabasejoin
 	/**
 	 * Get select option label
 	 *
+	 * @param  bool  $filter  get alt label for filter, if present using :: splitter
+	 *
 	 * @return  string
 	 */
 
-	protected function _getSelectLabel()
+	protected function _getSelectLabel($filter = false)
 	{
-		return FText::_($this->getParams()->get('cascadingdropdown_noselectionlabel', FText::_('COM_FABRIK_PLEASE_SELECT')));
+		//return FText::_($this->getParams()->get('cascadingdropdown_noselectionlabel', FText::_('COM_FABRIK_PLEASE_SELECT')));
+		$params = $this->getParams();
+		$label = $params->get('cascadingdropdown_noselectionlabel');
+
+		if (strstr($label, '::'))
+		{
+			$labels = explode('::', $label);
+			$label = $filter ? $labels[1] : $labels[0];
+		}
+
+		if (!$filter && $label == '')
+		{
+			$label = 'COM_FABRIK_PLEASE_SELECT';
+		}
+		return FText::_($label);
 	}
 
 	/**
@@ -1266,7 +1282,7 @@ class PlgFabrik_ElementCascadingdropdown extends PlgFabrik_ElementDatabasejoin
 	 * @return  string  required join text to ensure exact filter list code produces a valid query.
 	 */
 
-	protected function _buildFilterJoin()
+	protected function buildFilterJoin()
 	{
 		$params = $this->getParams();
 		$joinTable = FabrikString::safeColName($this->getDbName());
@@ -1308,7 +1324,7 @@ class PlgFabrik_ElementCascadingdropdown extends PlgFabrik_ElementDatabasejoin
 	protected function filterSelectLabel()
 	{
 		$params = $this->getParams();
-		$label = $params->get('cascadingdropdown_noselectionlabel', '');
+		$label = $this->_getSelectLabel(true);
 
 		if (empty($label))
 		{

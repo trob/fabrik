@@ -98,7 +98,7 @@ class FabrikControllerForm extends JControllerLegacy
 		// Set the default view name from the Request
 		$view = $this->getView($viewName, $viewType);
 
-		// Push a model into the view (may have been set in content plugin already
+		// Push a model into the view (may have been set in content plugin already)
 		$model = !isset($this->_model) ? $this->getModel($modelName, 'FabrikFEModel') : $this->_model;
 		$model->isMambot = $this->isMambot;
 		$model->packageId = $app->input->getInt('packageId');
@@ -178,6 +178,9 @@ class FabrikControllerForm extends JControllerLegacy
 
 	public function process()
 	{
+		$profiler = JProfiler::getInstance('Application');
+		JDEBUG ? $profiler->mark('controller process: start') : null;
+
 		$app = JFactory::getApplication();
 		$package = $app->getUserState('com_fabrik.package', 'fabrik');
 		$input = $app->input;
@@ -217,12 +220,16 @@ class FabrikControllerForm extends JControllerLegacy
 			JSession::checkToken() or die('Invalid Token');
 		}
 
+		JDEBUG ? $profiler->mark('controller process validate: start') : null;
+
 		if (!$model->validate())
 		{
 			$this->handleError($view, $model);
 
 			return;
 		}
+		JDEBUG ? $profiler->mark('controller process validate: end') : null;
+
 		// Reset errors as validate() now returns ok validations as empty arrays
 		$model->clearErrors();
 
@@ -252,6 +259,16 @@ class FabrikControllerForm extends JControllerLegacy
 			FabrikWorker::getPluginManager()->runPlugins('onError', $model);
 			$this->handleError($view, $model);
 
+			return;
+		}
+
+		/**
+		 * If debug submit is requested (&fabrikdebug=2, and J! debug on, and Fabrik debug allowed),
+		 * bypass any and all redirects, so we can see the profile for the submit
+		 */
+
+		if (FabrikHelperHTML::isDebugSubmit())
+		{
 			return;
 		}
 

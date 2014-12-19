@@ -127,7 +127,9 @@ class PlgFabrik_FormArticle extends PlgFabrik_Form
 
 		$data['images'] = json_encode($this->images());
 
-		if (is_null($id))
+		$isNew = is_null($id) ? true : false;
+		
+		if ($isNew)
 		{
 			$data['created'] = JFactory::getDate()->toSql();
 			$attribs['created_by'] = $user->get('id');
@@ -148,7 +150,6 @@ class PlgFabrik_FormArticle extends PlgFabrik_Form
 
 
 		$this->generateNewTitle($id, $catid, $data);
-		$isNew = is_null($id) ? true : false;
 
 		if (!$isNew)
 		{
@@ -167,11 +168,20 @@ class PlgFabrik_FormArticle extends PlgFabrik_Form
 
 		$item->store();
 
-		// Featured is handled by the admin content model.
-		JTable::addIncludePath(COM_FABRIK_BASE . 'administrator/components/com_content/tables');
-		JModelLegacy::addIncludePath(COM_FABRIK_BASE . 'administrator/components/com_content/models');
-		$articleModel = JModelLegacy::getInstance('Article', 'ContentModel');
-		$articleModel->featured($item->id, $item->featured);
+		/**
+		 * Featured is handled by the admin content model.
+		 * $$$ hugh - in 3.1, it seems to now just be in the regular content model $data
+		 */
+		
+		$version = new JVersion;
+		
+		if (version_compare($version->RELEASE, '3.1', '<'))
+		{
+			JTable::addIncludePath(COM_FABRIK_BASE . 'administrator/components/com_content/tables');
+			JModelLegacy::addIncludePath(COM_FABRIK_BASE . 'administrator/components/com_content/models');
+			$articleModel = JModelLegacy::getInstance('Article', 'ContentModel');
+			$articleModel->featured($item->id, $item->featured);
+		}
 
 		// Trigger the onContentAfterSave event.
 		$result = $dispatcher->trigger('onContentAfterSave', array('com_content.article', $item, $isNew));
@@ -185,6 +195,12 @@ class PlgFabrik_FormArticle extends PlgFabrik_Form
 			$item->store();
 		}
 
+		if (!$isNew)
+		{
+			$cache = JFactory::getCache('com_content');
+			$cache->clean($id);
+		}
+		
 		return $item;
 	}
 
@@ -555,9 +571,9 @@ class PlgFabrik_FormArticle extends PlgFabrik_Form
 
 		$message = stripslashes($message);
 
-		$editURL = COM_FABRIK_LIVESITE . 'index.php?option=com_' . $package . '&amp;view=form&amp;fabrik=' . $formModel->get('id') . '&amp;rowid='
+		$editURL = COM_FABRIK_LIVESITE . 'index.php?option=com_' . $package . '&amp;view=form&amp;formid=' . $formModel->get('id') . '&amp;rowid='
 			. $input->get('rowid', '', 'string');
-		$viewURL = COM_FABRIK_LIVESITE . 'index.php?option=com_' . $package . '&amp;view=details&amp;fabrik=' . $formModel->get('id') . '&amp;rowid='
+		$viewURL = COM_FABRIK_LIVESITE . 'index.php?option=com_' . $package . '&amp;view=details&amp;formid=' . $formModel->get('id') . '&amp;rowid='
 			. $input->get('rowid', '', 'string');
 		$editlink = '<a href="' . $editURL . '">' . FText::_('EDIT') . '</a>';
 		$viewlink = '<a href="' . $viewURL . '">' . FText::_('VIEW') . '</a>';

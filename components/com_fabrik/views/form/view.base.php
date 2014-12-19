@@ -51,9 +51,7 @@ class FabrikViewFormBase extends JViewLegacy
 		$app = JFactory::getApplication();
 		$input = $app->input;
 		$w = new FabrikWorker;
-		$config = JFactory::getConfig();
 		$model = $this->getModel('form');
-		$document = JFactory::getDocument();
 		$model->isMambot = $this->isMambot;
 		$form = $model->getForm();
 
@@ -118,6 +116,18 @@ class FabrikViewFormBase extends JViewLegacy
 
 		$form->error = $form->error === '' ? FText::_('COM_FABRIK_FAILED_VALIDATION') : FText::_($form->error);
 		$form->origerror = $form->error;
+		$clearErrors = false;
+
+		// Module rendered without ajax, we need to assign the session errors back into the model
+		if ($model->isMambot)
+		{
+			$package = $app->getUserState('com_fabrik.package', 'fabrik');
+			$context = 'com_' . $package . '.form.' . $form->id . '.' . $this->rowid . '.';
+			$session = JFactory::getSession();
+			$model->errors = $session->get($context . 'errors', array());
+			$clearErrors = true;
+		}
+
 		$form->error = $model->hasErrors() ? $form->error : '';
 		JDEBUG ? $profiler->mark('form view before validation classes loaded') : null;
 
@@ -134,10 +144,6 @@ class FabrikViewFormBase extends JViewLegacy
 		$this->tipLocation = $params->get('tiplocation');
 
 		FabrikHelperHTML::debug($this->groups, 'form:view:groups');
-
-		// Cck in admin?
-		$this->cck();
-		JDEBUG ? $profiler->mark('form view: after cck') : null;
 
 		// Force front end templates
 		$this->_basePath = COM_FABRIK_FRONTEND . '/views';
@@ -164,7 +170,14 @@ class FabrikViewFormBase extends JViewLegacy
 		$this->addTemplatePath($this->_basePath . '/' . $folder . '/' . $jTmplFolder . '/' . $tmpl);
 
 		$root = $app->isAdmin() ? JPATH_ADMINISTRATOR : JPATH_SITE;
-		$this->addTemplatePath($root . '/templates/' . $app->getTemplate() . '/html/com_fabrik/form/' . $tmpl);
+		$this->addTemplatePath($root . '/templates/' . $app->getTemplate() . '/html/com_fabrik/'. $folder. '/'.  $tmpl);
+
+		// If rendered as a module (non ajax) and we have inserted the session errors, clear them from the session.
+		if ($clearErrors)
+		{
+			$model->clearErrors();
+		}
+
 		JDEBUG ? $profiler->mark('form view before template load') : null;
 	}
 
@@ -185,11 +198,12 @@ class FabrikViewFormBase extends JViewLegacy
 
 		if ($params->get('process-jplugins', 2) == 1 || ($params->get('process-jplugins', 2) == 2 && $model->isEditable() === false))
 		{
-			FabrikHelperHTML::runConentPlugins($text);
+			FabrikHelperHTML::runContentPlugins($text);
 		}
 
-		// Allows you to use {placeholders} in form template.
-		$text = $w->parseMessageForPlaceHolder($text, $model->data);
+		// Allows you to use {placeholders} in form template Only replacing data accessible to the users acl.
+		$view = $model->isEditable() === false ? 'details' : 'form';
+		$text = $w->parseMessageForPlaceHolder($text, $model->accessibleData($view));
 		echo $text;
 	}
 
@@ -369,6 +383,7 @@ class FabrikViewFormBase extends JViewLegacy
 	{
 		$app = JFactory::getApplication();
 		$package = $app->getUserState('com_fabrik.package', 'fabrik');
+		$pluginManager = FabrikWorker::getPluginManager();
 		$input = $app->input;
 		$document = JFactory::getDocument();
 		$model = $this->getModel();
@@ -457,7 +472,11 @@ class FabrikViewFormBase extends JViewLegacy
 		FabrikHelperHTML::tips('.hasTip', array(), "$('$bkey')");
 		$model->getFormCss();
 		$opts = $this->jsOpts();
-		$opts = json_encode($opts);
+
+		$model->jsOpts = $opts;
+		$res = $pluginManager->runPlugins('onJSOpts', $model);
+
+		$opts = json_encode($model->jsOpts);
 
 		if (!FabrikHelperHTML::inAjaxLoadedPage())
 		{
@@ -560,7 +579,6 @@ class FabrikViewFormBase extends JViewLegacy
 			$script[] = "new FloatingTips('#" . $bkey . " .fabrikTip', " . json_encode($tipOpts) . ");";
 		}
 
-		$pluginManager = FabrikWorker::getPluginManager();
 		$res = $pluginManager->runPlugins('onJSReady', $model);
 
 		if (in_array(false, $res))
@@ -654,6 +672,7 @@ class FabrikViewFormBase extends JViewLegacy
 		$maxRepeat = array();
 		$minRepeat = array();
 		$showMaxRepeats = array();
+		$minMaxErrMsg = array();
 
 		foreach ($this->groups as $g)
 		{
@@ -661,12 +680,14 @@ class FabrikViewFormBase extends JViewLegacy
 			$maxRepeat[$g->id] = $g->maxRepeat;
 			$minRepeat[$g->id] = $g->minRepeat;
 			$showMaxRepeats[$g->id] = $g->showMaxRepeats;
+			$minMaxErrMsg[$g->id] = $g->minMaxErrMsg;
 		}
 
 		$opts->hiddenGroup = $hidden;
 		$opts->maxRepeat = $maxRepeat;
 		$opts->minRepeat = $minRepeat;
 		$opts->showMaxRepeats = $showMaxRepeats;
+		$opts->minMaxErrMsg = $minMaxErrMsg;
 
 		// $$$ hugh adding these so calc element can easily find joined and repeated join groups
 		// when it needs to add observe events ... don't ask ... LOL!
@@ -929,6 +950,16 @@ class FabrikViewFormBase extends JViewLegacy
 
 		foreach ($groups as $groupModel)
 		{
+			if ($groupModel->isJoin())
+			{
+				$groupPk = $groupModel->getJoinModel()->getForeignId();
+				$groupRowIds = (array) JArrayHelper::getValue($this->data, $groupPk, array());
+				$groupRowIds = htmlentities(json_encode($groupRowIds));
+
+				// Used to check against in group process(), when deleting removed repeat groups
+				$fields[] = '<input type="hidden" name="fabrik_group_rowids[' . $groupModel->getId() . ']" value="' . $groupRowIds . '" />';
+			}
+
 			$group = $groupModel->getGroup();
 			$c = $groupModel->repeatTotal;
 
@@ -1116,47 +1147,4 @@ class FabrikViewFormBase extends JViewLegacy
 		$aHiddenFields = array_merge($aHiddenFields, array_values($fields));
 	}
 
-	/**
-	 * Load up the cck view
-	 *
-	 * @return void
-	 */
-
-	protected function cck()
-	{
-		$app = JFactory::getApplication();
-		$input = $app->input;
-
-		if ($input->get('task') === 'cck')
-		{
-			$model = $this->getModel();
-			$params = $model->getParams();
-			$row = $model->getForm();
-			JHTML::script('admincck.js', 'administrator/components/com_fabrik/views/', true);
-			$document = JFactory::getDocument();
-			$opts = new stdClass;
-			$opts->livesite = JURI::base();
-			$opts->ename = $input->get('e_name');
-			$opts->catid = $input->getInt('catid');
-			$opts->section = $input->getInt('section');
-			$opts->formid = $row->id;
-
-			$tmpl = ($row->form_template == '') ? "default" : $row->form_template;
-			$tmpl = $input->get('cck_layout', $tmpl);
-
-			$opts->tmplList = FabrikHelperAdminHTML::templateList('form', 'fabrik_cck_template', $tmpl);
-
-			$views = array();
-			$views[] = JHTML::_('select.option', 'form');
-			$views[] = JHTML::_('select.option', 'details');
-			$selView = $input->get('cck_view');
-			$opts->viewList = JHTML::_('select.radiolist', $views, 'fabrik_cck_view', 'class="inputbox"', 'value', 'text', $selView);
-
-			$opts = json_encode($opts);
-			$script = "window.addEvent('fabrik.loaded', function() {
-			new adminCCK($opts);
-		});";
-			FabrikHelperHTML::addScriptDeclaration($script);
-		}
-	}
 }
