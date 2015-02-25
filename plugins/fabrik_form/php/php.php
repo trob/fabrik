@@ -202,7 +202,8 @@ class PlgFabrik_FormPHP extends PlgFabrik_Form
 		if ($params->get('only_process_curl') == 'onBeforeCalculations')
 		{
 			if ($this->_runPHP() === false)
-			{	$code = $params->get('curl_code', '');
+			{
+				$code = $params->get('curl_code', '');
 				$error = error_get_last();
 				return JError::raiseWarning(E_WARNING, 'php form plugin failed:<br>'.$code.'<br>'.$error['type']. $error['message']);
 			}
