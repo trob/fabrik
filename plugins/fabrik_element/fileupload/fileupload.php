@@ -2199,7 +2199,7 @@ class PlgFabrik_ElementFileupload extends PlgFabrik_Element
 
 		$allRenders = implode('<br/>', $allRenders);
 		$allRenders .= ($allRenders == '') ? '' : '<br/>';
-		$str[] = $allRenders . '<input class="fabrikinput" name="' . $name . '" type="file" capture = "camera" accept = ".jpg,.pdf" id="' . $id . '" />' . "\n";
+		$str[] = $allRenders . '<input class="fabrikinput" name="' . $name . '" type="file" id="' . $id . '" />' . "\n";
 
 		if ($params->get('fileupload_storage_type', 'filesystemstorage') == 'filesystemstorage' && $params->get('upload_allow_folderselect') == '1')
 		{
