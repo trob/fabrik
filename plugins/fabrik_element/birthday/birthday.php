@@ -54,9 +54,9 @@ class PlgFabrik_ElementBirthday extends PlgFabrik_Element
 
 		if (is_array($value))
 		{
-			$day = JArrayHelper::getValue($value, 0);
-			$month = JArrayHelper::getValue($value, 1);
-			$year = JArrayHelper::getValue($value, 2);
+			$day = FArrayHelper::getValue($value, 0);
+			$month = FArrayHelper::getValue($value, 1);
+			$year = FArrayHelper::getValue($value, 2);
 			$value = $year . '-' . $month . '-' . $day;
 		}
 
@@ -234,10 +234,9 @@ class PlgFabrik_ElementBirthday extends PlgFabrik_Element
 		{
 			// Weirdness for failed validation
 			$value = strstr($value, ',') ? array_reverse(explode(',', $value)) : explode('-', $value);
-			$yearvalue = JArrayHelper::getValue($value, 0);
-			$monthvalue = JArrayHelper::getValue($value, 1);
-			$dayvalue = JArrayHelper::getValue($value, 2);
-
+			$yearvalue = FArrayHelper::getValue($value, 0);
+			$monthvalue = FArrayHelper::getValue($value, 1);
+			$dayvalue = FArrayHelper::getValue($value, 2);
 			$days = array(JHTML::_('select.option', '', $params->get('birthday_daylabel', FText::_('DAY'))));
 
 			for ($i = 1; $i < 32; $i++)
@@ -268,7 +267,17 @@ class PlgFabrik_ElementBirthday extends PlgFabrik_Element
 			}
 
 			$errorCSS = (isset($this->_elementError) && $this->_elementError != '') ? " elementErrorHighlight" : '';
-			$attribs = 'class="input-small fabrikinput inputbox' . $errorCSS . '"';
+
+			if (!$this->getGroup()->canRepeat())
+			{
+				$advanced = $params->get('advanced_behavior', '0') == '1' ? ' advancedSelect ' : '';
+			}
+			else
+			{
+				$advanced = '';
+			}
+
+			$attribs = 'class="input-small fabrikinput inputbox' . $advanced . $errorCSS . '"';
 			$str = array();
 			$str[] = '<div class="fabrikSubElementContainer" id="' . $id . '">';
 

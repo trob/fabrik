@@ -134,7 +134,7 @@ class PlgFabrik_ElementDatabasejoin extends PlgFabrik_ElementList
 		$connection = $listModel->getConnection();
 
 		// Make sure same connection as this table
-		$fullElName = JArrayHelper::getValue($opts, 'alias', $table . '___' . $element->name);
+		$fullElName = FArrayHelper::getValue($opts, 'alias', $table . '___' . $element->name);
 
 		if ($params->get('join_conn_id') == $connection->get('id') || $element->plugin != 'databasejoin')
 		{
@@ -163,7 +163,7 @@ class PlgFabrik_ElementDatabasejoin extends PlgFabrik_ElementList
 			$k = FabrikString::safeColName($keytable . '.' . $element->name);
 			$k2 = $this->getJoinLabelColumn();
 
-			if (JArrayHelper::getValue($opts, 'inc_raw', true))
+			if (FArrayHelper::getValue($opts, 'inc_raw', true))
 			{
 				$aFields[] = $k . ' AS ' . $db->quoteName($fullElName . '_raw');
 				$aAsFields[] = $db->quoteName($fullElName . '_raw');
@@ -1047,7 +1047,7 @@ class PlgFabrik_ElementDatabasejoin extends PlgFabrik_ElementList
 
 		if (!empty($this->autocomplete_where))
 		{
-			$mode = JArrayHelper::getValue($opts, 'mode', 'form');
+			$mode = FArrayHelper::getValue($opts, 'mode', 'form');
 			$displayType = $params->get('database_join_display_type', 'dropdown');
 			$filterType = $element->filter_type;
 
@@ -1059,6 +1059,17 @@ class PlgFabrik_ElementDatabasejoin extends PlgFabrik_ElementList
 			}
 		}
 
+		/*
+		 * $$$ hugh - experimenting with optional "filter where", will probably move this in to filterValueList_foo,
+		 * but first cut it's safer to put it here (don't ask).
+		 */
+		
+		$filterWhere = trim($params->get('database_join_filter_where_sql', ''));
+		if (FArrayHelper::getValue($opts, 'mode', '') === 'filter' && !empty($filterWhere))
+		{
+			$where .= JString::stristr($where, 'WHERE') ? ' AND ' . $filterWhere : ' WHERE ' . $filterWhere;
+		}
+		
 		if ($where == '')
 		{
 			return $query ? $query : $where;
@@ -1265,7 +1276,7 @@ class PlgFabrik_ElementDatabasejoin extends PlgFabrik_ElementList
 		if (!$formModel->isEditable() || !$this->isEditable())
 		{
 			// Read only element formatting...
-			if (JArrayHelper::getValue($defaultLabels, 0) === $params->get('database_join_noselectionlabel', FText::_('COM_FABRIK_PLEASE_SELECT')))
+			if (FArrayHelper::getValue($defaultLabels, 0) === $params->get('database_join_noselectionlabel', FText::_('COM_FABRIK_PLEASE_SELECT')))
 			{
 				// No point showing 'please select' for read only
 				unset($defaultLabels[0]);
@@ -1330,7 +1341,7 @@ class PlgFabrik_ElementDatabasejoin extends PlgFabrik_ElementList
 			$i = 0;
 			foreach ($targetIds as $tkey => $targetId)
 			{
-				$tmpLabel = JArrayHelper::getValue($defaultLabels, $i, 'unknown label');
+				$tmpLabel = FArrayHelper::getValue($defaultLabels, $i, 'unknown label');
 				$defaultLabels[$i] = $this->getReadOnlyOutput($targetId, $tmpLabel);
 				$i++;
 			}
@@ -1344,7 +1355,17 @@ class PlgFabrik_ElementDatabasejoin extends PlgFabrik_ElementList
 			// $$$rob should be canUse() otherwise if user set to view but not use the dd was shown
 			if ($this->canUse())
 			{
-				$attribs = 'class="fabrikinput inputbox input ' . $params->get('bootstrap_class', 'input-large') . '" size="1"';
+
+				if (!$this->getGroup()->canRepeat())
+				{
+					$advanced = $params->get('advanced_behavior', '0') == '1' ? ' advancedSelect ' : '';
+				}
+				else
+				{
+					$advanced = '';
+				}
+
+				$attribs = 'class="fabrikinput inputbox input ' . $advanced . $params->get('bootstrap_class', 'input-large') . '" size="1"';
 
 				// If user can access the drop down
 				switch ($displayType)
@@ -1354,7 +1375,7 @@ class PlgFabrik_ElementDatabasejoin extends PlgFabrik_ElementList
 						$html[] = JHTML::_('select.genericlist', $tmp, $name, $attribs, 'value', 'text', $default, $id);
 						break;
 					case 'radio':
-						$this->renderRadioList($data, $repeatCounter, $html, $tmp, JArrayHelper::getValue($default, 0));
+						$this->renderRadioList($data, $repeatCounter, $html, $tmp, FArrayHelper::getValue($default, 0));
 						break;
 					case 'checkbox':
 						$this->renderCheckBoxList($data, $repeatCounter, $html, $tmp, $default);
@@ -1425,7 +1446,7 @@ class PlgFabrik_ElementDatabasejoin extends PlgFabrik_ElementList
 		{
 			$html[] = '<div class="dbjoin-description">';
 			$opts = $this->_getOptionVals($data, $repeatCounter);
-			$default_val = JArrayHelper::getValue($default, 0);
+			$default_val = FArrayHelper::getValue($default, 0);
 
 			// @FIXME - if read only, surely no need to insert every possible value, we just need the selected one?
 			for ($i = 0; $i < count($opts); $i++)
@@ -1461,8 +1482,8 @@ class PlgFabrik_ElementDatabasejoin extends PlgFabrik_ElementList
 			{
 				for ($i = 0; $i < count($defaultLabels); $i++)
 				{
-					$url = $popUrl . JArrayHelper::getValue($defaultValues, $i, '');
-					$defaultLabels[$i] = '<a href="' . JRoute::_($url) . '">' . JArrayHelper::getValue($defaultLabels, $i) . '</a>';
+					$url = $popUrl . FArrayHelper::getValue($defaultValues, $i, '');
+					$defaultLabels[$i] = '<a href="' . JRoute::_($url) . '">' . FArrayHelper::getValue($defaultLabels, $i) . '</a>';
 				}
 			}
 		}
@@ -1576,11 +1597,11 @@ class PlgFabrik_ElementDatabasejoin extends PlgFabrik_ElementList
 		$placeholder = ' placeholder="' . htmlspecialchars($params->get('placeholder', ''), ENT_COMPAT) . '"';
 		$autoCompleteName = str_replace('[]', '', $thisElName) . '-auto-complete';
 		$html[] = '<input type="text" size="' . $params->get('dbjoin_autocomplete_size', '20') . '" name="' . $autoCompleteName . '" id="' . $id
-		. '-auto-complete" value="' . JArrayHelper::getValue($label, 0) . '"' . $class . $placeholder . '/>';
+		. '-auto-complete" value="' . FArrayHelper::getValue($label, 0) . '"' . $class . $placeholder . '/>';
 
 		// $$$ rob - class property required when cloning repeat groups - don't remove
 		$html[] = '<input type="hidden" tabindex="-1" class="fabrikinput" name="' . $thisElName . '" id="' . $id . '" value="'
-			. JArrayHelper::getValue($default, 0, '') . '"/>';
+			. FArrayHelper::getValue($default, 0, '') . '"/>';
 	}
 
 	/**
@@ -1693,7 +1714,7 @@ class PlgFabrik_ElementDatabasejoin extends PlgFabrik_ElementList
 	{
 		$name = $this->getFullName(true, false);
 
-		if (!$this->isJoin() && JArrayHelper::getValue($opts, 'valueFormat', 'raw') == 'raw')
+		if (!$this->isJoin() && FArrayHelper::getValue($opts, 'valueFormat', 'raw') == 'raw')
 		{
 			$name .= '_raw';
 		}
@@ -2823,6 +2844,17 @@ class PlgFabrik_ElementDatabasejoin extends PlgFabrik_ElementList
 		$this->elementJavascriptJoinOpts($opts);
 		$opts->isJoin = $this->isJoin();
 
+		if (!$this->getGroup()->canRepeat())
+		{
+			$advanced = $params->get('advanced_behavior', '0') == '1';
+		}
+		else
+		{
+			$advanced = false;
+		}
+		
+		$opts->advanced = $advanced;
+		
 		return $opts;
 	}
 
@@ -3132,7 +3164,7 @@ class PlgFabrik_ElementDatabasejoin extends PlgFabrik_ElementList
 				// In a repeat group
 				if (is_array($v))
 				{
-					$v = JArrayHelper::getValue($v, $repeatCounter);
+					$v = FArrayHelper::getValue($v, $repeatCounter);
 				}
 			}
 
@@ -3539,7 +3571,7 @@ class PlgFabrik_ElementDatabasejoin extends PlgFabrik_ElementList
 			$join = $this->getJoinModel()->getJoin();
 			$repeatName = $join->table_join . '___' . $this->getElement()->name;
 
-			return count(JArrayHelper::getValue($data, $repeatName, array()));
+			return count(FArrayHelper::getValue($data, $repeatName, array()));
 		}
 		else
 		{
@@ -3594,8 +3626,8 @@ class PlgFabrik_ElementDatabasejoin extends PlgFabrik_ElementList
 		{
 			$join = $this->getJoinModel();
 			$fields = $join->getJoin()->getFields();
-			$field = JArrayHelper::fromObject(JArrayHelper::getValue($fields, $this->getLabelParamVal(), array()));
-			$type = JArrayHelper::getValue($field, 'Type', '');
+			$field = JArrayHelper::fromObject(FArrayHelper::getValue($fields, $this->getLabelParamVal(), array()));
+			$type = FArrayHelper::getValue($field, 'Type', '');
 			$notAllowed = array('int', 'double', 'decimal', 'date', 'serial', 'bit', 'boolean', 'real');
 
 			foreach ($notAllowed as $test)

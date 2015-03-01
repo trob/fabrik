@@ -63,7 +63,17 @@ class PlgFabrik_ElementDropdown extends PlgFabrik_ElementList
 		$selected = (array) $this->getValue($data, $repeatCounter);
 		$errorCSS = $this->elementError != '' ? " elementErrorHighlight" : '';
 		$boostrapClass = $params->get('bootstrap_class', '');
-		$attribs = 'class="fabrikinput inputbox input ' . $errorCSS . ' ' . $boostrapClass . '"';
+
+        if (!$this->getGroup()->canRepeat())
+        {
+			$advanced = $params->get('advanced_behavior', '0') == '1' ? ' advancedSelect ' : '';
+        }
+        else
+        {
+        	$advanced = '';
+        }
+
+		$attribs = 'class="fabrikinput inputbox input ' . $advanced . $errorCSS . ' ' . $boostrapClass . '"';
 
 		if ($multiple == "1")
 		{
@@ -82,8 +92,8 @@ class PlgFabrik_ElementDropdown extends PlgFabrik_ElementList
 				$optgroup = true;
 			}
 
-			$tmpLabel = JArrayHelper::getValue($labels, $i);
-			$disable = JArrayHelper::getValue($endis, $i);
+			$tmpLabel = FArrayHelper::getValue($labels, $i);
+			$disable = FArrayHelper::getValue($endis, $i);
 				
 			// For values like '1"'
 			$tmpval = htmlspecialchars($tmpval, ENT_QUOTES);
@@ -166,13 +176,6 @@ class PlgFabrik_ElementDropdown extends PlgFabrik_ElementList
 	public function elementJavascript($repeatCounter)
 	{
 		$params = $this->getParams();
-		$advanced = $params->get('advanced_behavior', '0') == '1';
-		
-		if ($advanced)
-		{
-			JHtml::_('formbehavior.chosen', 'select');
-		}
-		
 		$id = $this->getHTMLId($repeatCounter);
 		$element = $this->getElement();
 		$data = $this->getFormModel()->data;
@@ -185,6 +188,16 @@ class PlgFabrik_ElementDropdown extends PlgFabrik_ElementList
 		$opts->defaultVal = $this->getDefaultValue($data);
 		$opts->data = (empty($values) && empty($labels)) ? array() : array_combine($values, $labels);
 		$opts->multiple = (bool) $params->get('multiple', '0') == '1';
+		
+		if (!$this->getGroup()->canRepeat())
+		{
+			$advanced = $params->get('advanced_behavior', '0') == '1';
+		}
+		else
+		{
+			$advanced = false;
+		}
+		
 		$opts->advanced = $advanced;
 		JText::script('PLG_ELEMENT_DROPDOWN_ENTER_VALUE_LABEL');
 
